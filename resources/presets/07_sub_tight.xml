@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Sub Tight" category="Bass" author="Pentagrit" description="Shorter, rounder sub">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="2"/>
+    <PARAM id="xover1" value="90"/>
+    <PARAM id="b1_sustain" value="-6"/>
+    <PARAM id="b1_satType" value="1"/>
+    <PARAM id="b1_drive" value="6"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>

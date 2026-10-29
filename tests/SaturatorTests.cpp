@@ -21,7 +21,8 @@ void run(Saturator& s, Signal& x)
 
 double harmonicDb(const Signal& y, size_t from, size_t len, double f0, double fs, int harmonic)
 {
-    Signal seg(y.begin() + static_cast<std::ptrdiff_t>(from), y.begin() + static_cast<std::ptrdiff_t>(from + len));
+    Signal seg(y.begin() + static_cast<std::ptrdiff_t>(from),
+               y.begin() + static_cast<std::ptrdiff_t>(from + len));
     // Hann window to avoid leakage
     for (size_t i = 0; i < len; ++i)
         seg[i] *= 0.5f - 0.5f * static_cast<float>(std::cos(2.0 * kPi * double(i) / double(len)));
@@ -81,8 +82,10 @@ TEST_CASE("Saturator curves", "[Saturator]")
     }
     SECTION("specific values")
     {
-        CHECK(std::abs(Saturator::shape(SatType::softClip, 1.0f) - Saturator::shape(SatType::softClip, 1.0001f)) < 1e-4f);
-        CHECK(std::abs(Saturator::shape(SatType::softClip, -1.0f) - Saturator::shape(SatType::softClip, -1.0001f)) < 1e-4f);
+        CHECK(std::abs(Saturator::shape(SatType::softClip, 1.0f) -
+                       Saturator::shape(SatType::softClip, 1.0001f)) < 1e-4f);
+        CHECK(std::abs(Saturator::shape(SatType::softClip, -1.0f) -
+                       Saturator::shape(SatType::softClip, -1.0001f)) < 1e-4f);
         CHECK(std::abs(Saturator::shape(SatType::softClip, 1.0f) - 1.0f) < 1e-6f);
         CHECK(std::abs(Saturator::shape(SatType::wavefold, 3.0f) + 1.0f) < 1e-5f);
         CHECK(Saturator::shape(SatType::hardClip, 2.0f) == 1.0f);

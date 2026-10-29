@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Room Tamer" category="Drums" author="Pentagrit" description="Reduces room tail above the low end">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="5"/>
+    <PARAM id="xover1" value="150"/>
+    <PARAM id="xover2" value="600"/>
+    <PARAM id="xover3" value="2000"/>
+    <PARAM id="xover4" value="6000"/>
+    <PARAM id="b3_sustain" value="-9"/>
+    <PARAM id="b3_speed" value="0.2"/>
+    <PARAM id="b4_sustain" value="-9"/>
+    <PARAM id="b4_speed" value="0.2"/>
+    <PARAM id="b5_sustain" value="-9"/>
+    <PARAM id="b5_speed" value="0.2"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>

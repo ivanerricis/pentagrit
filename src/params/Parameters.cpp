@@ -7,8 +7,8 @@ namespace pentagrit
 {
 juce::String bandParamID(int band0, BandParam p)
 {
-    static constexpr const char* names[] = {"gain", "attack", "sustain", "speed", "satType",
-                                            "drive", "mix", "mute", "solo", "bypass"};
+    static constexpr const char* names[] = {"gain",  "attack", "sustain", "speed", "satType",
+                                            "drive", "mix",    "mute",    "solo",  "bypass"};
     return "b" + juce::String(band0 + 1) + "_" + names[static_cast<int>(p)];
 }
 
@@ -17,7 +17,10 @@ namespace
 using juce::ParameterID;
 using Attr = juce::AudioParameterFloatAttributes;
 
-ParameterID makeID(const juce::String& id) { return ParameterID{id, kParamVersion}; }
+ParameterID makeID(const juce::String& id)
+{
+    return ParameterID{id, kParamVersion};
+}
 
 juce::String dbText(float v, int)
 {
@@ -38,9 +41,7 @@ juce::String hzText(float v, int)
 juce::NormalisableRange<float> logFreqRange()
 {
     constexpr float lo = 20.0f, hi = 20000.0f;
-    return {lo,
-            hi,
-            [](float s, float e, float n) { return s * std::pow(e / s, n); },
+    return {lo, hi, [](float s, float e, float n) { return s * std::pow(e / s, n); },
             [](float s, float e, float v) { return std::log(juce::jlimit(s, e, v) / s) / std::log(e / s); },
             [](float s, float e, float v) { return juce::jlimit(s, e, v); }};
 }
@@ -54,18 +55,21 @@ const juce::StringArray& satTypeNames()
 std::unique_ptr<juce::AudioParameterFloat> dbParam(const juce::String& id, const juce::String& name, float lo,
                                                    float hi, float def)
 {
-    return std::make_unique<juce::AudioParameterFloat>(makeID(id), name, juce::NormalisableRange<float>(lo, hi, 0.1f),
-                                                       def,
-                                                       Attr().withLabel("dB").withStringFromValueFunction(dbText));
+    return std::make_unique<juce::AudioParameterFloat>(
+        makeID(id), name, juce::NormalisableRange<float>(lo, hi, 0.1f), def,
+        Attr().withLabel("dB").withStringFromValueFunction(dbText));
 }
 
-std::unique_ptr<juce::AudioParameterFloat> unitParam(const juce::String& id, const juce::String& name, float def)
+std::unique_ptr<juce::AudioParameterFloat> unitParam(const juce::String& id, const juce::String& name,
+                                                     float def)
 {
-    return std::make_unique<juce::AudioParameterFloat>(makeID(id), name, juce::NormalisableRange<float>(0.0f, 1.0f),
-                                                       def, Attr().withStringFromValueFunction(percentText));
+    return std::make_unique<juce::AudioParameterFloat>(makeID(id), name,
+                                                       juce::NormalisableRange<float>(0.0f, 1.0f), def,
+                                                       Attr().withStringFromValueFunction(percentText));
 }
 
-std::unique_ptr<juce::AudioParameterBool> boolParam(const juce::String& id, const juce::String& name, bool def)
+std::unique_ptr<juce::AudioParameterBool> boolParam(const juce::String& id, const juce::String& name,
+                                                    bool def)
 {
     return std::make_unique<juce::AudioParameterBool>(makeID(id), name, def);
 }
@@ -107,8 +111,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         layout.add(dbParam(id(BandParam::attack), prefix + "Attack", -24.0f, 24.0f, 0.0f));
         layout.add(dbParam(id(BandParam::sustain), prefix + "Sustain", -24.0f, 24.0f, 0.0f));
         layout.add(unitParam(id(BandParam::speed), prefix + "Speed", 0.5f));
-        layout.add(std::make_unique<juce::AudioParameterChoice>(makeID(id(BandParam::satType)), prefix + "Saturation",
-                                                                satTypeNames(), 0));
+        layout.add(std::make_unique<juce::AudioParameterChoice>(makeID(id(BandParam::satType)),
+                                                                prefix + "Saturation", satTypeNames(), 0));
         layout.add(dbParam(id(BandParam::drive), prefix + "Drive", 0.0f, 36.0f, 6.0f));
         layout.add(unitParam(id(BandParam::mix), prefix + "Mix", 1.0f));
         layout.add(boolParam(id(BandParam::mute), prefix + "Mute", false));
