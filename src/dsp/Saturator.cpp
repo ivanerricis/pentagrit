@@ -95,7 +95,7 @@ namespace
 constexpr int kChunk = 256;
 
 // Vectorizable block version of Saturator::shape (u -> s), same maths.
-void shapeBlock(SatType type, const float* u, float* s, int n) noexcept
+void shapeBlock(SatType type, const float* __restrict u, float* __restrict s, int n) noexcept
 {
     switch (type)
     {
@@ -149,70 +149,110 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
     const float invFade = 1.0f / static_cast<float>(fadeLen_);
     float g = smoothGain_;
     int fp = fadePos_;
-    float gain[kChunk], u[kChunk], s[kChunk];
+    float gain[kChunk], u[kChunk], sb[2][kChunk];
 
     for (int start = 0; start < numSamples; start += kChunk)
     {
         const int len = std::min(kChunk, numSamples - start);
 
-        // Drive smoothing and crossfade position are shared by all channels.
-        for (int i = 0; i < len; ++i)
-        {
-            g = targetGain_ + driveCoeff_ * (g - targetGain_);
-            gain[i] = g;
-        }
+        // Drive smoothing and crossfade position are shared by all channels. Once the smoother has settled on
+        // the target the gain is constant and the recursion is skipped.
+        const bool constGain = g == targetGain_;
+        if (!constGain)
+            for (int i = 0; i < len; ++i)
+            {
+                g = targetGain_ + driveCoeff_ * (g - targetGain_);
+                gain[i] = g;
+            }
+        const float tg = targetGain_;
         const bool chunkFading = fp < fadeLen_;
 
-        for (size_t ch = 0; ch < numCh; ++ch)
+        // Channels are processed in pairs so the two serial DC-blocker recursions overlap.
+        for (size_t ch0 = 0; ch0 < numCh; ch0 += 2)
         {
-            float* d = block.getChannelPointer(ch) + start;
-            float x1 = dcX1_[ch], y1 = dcY1_[ch];
-
-            for (int i = 0; i < len; ++i)
-                u[i] = d[i] * gain[i];
-
-            if (chunkFading)
+            const size_t np = std::min<size_t>(2, numCh - ch0);
+            for (size_t k = 0; k < np; ++k)
             {
-                std::array<float, kChunk> sPrev, sCur;
-                shapeBlock(prevType_, u, sPrev.data(), len);
-                shapeBlock(type_, u, sCur.data(), len);
-                for (int i = 0; i < len; ++i)
+                float* d = block.getChannelPointer(ch0 + k) + start;
+                float* s = sb[k];
+                if (constGain)
+                    for (int i = 0; i < len; ++i)
+                        u[i] = d[i] * tg;
+                else
+                    for (int i = 0; i < len; ++i)
+                        u[i] = d[i] * gain[i];
+
+                if (chunkFading)
                 {
-                    const int p = fp + i;
-                    if (p < fadeLen_)
+                    std::array<float, kChunk> sPrev, sCur;
+                    shapeBlock(prevType_, u, sPrev.data(), len);
+                    shapeBlock(type_, u, sCur.data(), len);
+                    for (int i = 0; i < len; ++i)
                     {
-                        const float t = static_cast<float>(p + 1) * invFade;
-                        const float a = prevType_ == SatType::off ? d[i] : sPrev[static_cast<size_t>(i)];
+                        const int p = fp + i;
                         const float b = type_ == SatType::off ? d[i] : sCur[static_cast<size_t>(i)];
-                        s[i] = a * (1.0f - t) + b * t;
-                    }
-                    else
-                    {
-                        s[i] = type_ == SatType::off ? d[i] : sCur[static_cast<size_t>(i)];
+                        if (p < fadeLen_)
+                        {
+                            const float t = static_cast<float>(p + 1) * invFade;
+                            const float a = prevType_ == SatType::off ? d[i] : sPrev[static_cast<size_t>(i)];
+                            s[i] = a * (1.0f - t) + b * t;
+                        }
+                        else
+                        {
+                            s[i] = b;
+                        }
                     }
                 }
+                else if (type_ == SatType::off)
+                {
+                    std::copy(d, d + len, s);
+                }
+                else
+                {
+                    shapeBlock(type_, u, s, len);
+                }
             }
-            else if (type_ == SatType::off)
+
+            // Branch-free DC blocker; denormals are flushed once per chunk (the pole is so slow that the
+            // state cannot cross the denormal range within a chunk).
+            const float dc = dcCoeff_;
+            if (np == 2)
             {
-                std::copy(d, d + len, s);
+                float* d0 = block.getChannelPointer(ch0) + start;
+                float* d1 = block.getChannelPointer(ch0 + 1) + start;
+                float xa = dcX1_[ch0], ya = dcY1_[ch0], xb = dcX1_[ch0 + 1], yb = dcY1_[ch0 + 1];
+                for (int i = 0; i < len; ++i)
+                {
+                    const float sa = sb[0][i], sc = sb[1][i];
+                    const float y0 = sa - xa + dc * ya;
+                    const float y1 = sc - xb + dc * yb;
+                    xa = sa;
+                    xb = sc;
+                    ya = y0;
+                    yb = y1;
+                    d0[i] = y0;
+                    d1[i] = y1;
+                }
+                dcX1_[ch0] = std::abs(xa) < 1.0e-20f ? 0.0f : xa;
+                dcY1_[ch0] = std::abs(ya) < 1.0e-20f ? 0.0f : ya;
+                dcX1_[ch0 + 1] = std::abs(xb) < 1.0e-20f ? 0.0f : xb;
+                dcY1_[ch0 + 1] = std::abs(yb) < 1.0e-20f ? 0.0f : yb;
             }
             else
             {
-                shapeBlock(type_, u, s, len);
+                float* d0 = block.getChannelPointer(ch0) + start;
+                float xa = dcX1_[ch0], ya = dcY1_[ch0];
+                for (int i = 0; i < len; ++i)
+                {
+                    const float sa = sb[0][i];
+                    const float y0 = sa - xa + dc * ya;
+                    xa = sa;
+                    ya = y0;
+                    d0[i] = y0;
+                }
+                dcX1_[ch0] = std::abs(xa) < 1.0e-20f ? 0.0f : xa;
+                dcY1_[ch0] = std::abs(ya) < 1.0e-20f ? 0.0f : ya;
             }
-
-            const float dc = dcCoeff_;
-            for (int i = 0; i < len; ++i)
-            {
-                float y = s[i] - x1 + dc * y1;
-                if (std::abs(y) < 1.0e-20f)
-                    y = 0.0f;
-                x1 = s[i];
-                y1 = y;
-                d[i] = y;
-            }
-            dcX1_[ch] = x1;
-            dcY1_[ch] = y1;
         }
         if (chunkFading)
             fp = std::min(fp + len, fadeLen_);

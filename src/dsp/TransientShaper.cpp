@@ -121,7 +121,8 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
             float gT = 0.0f;
             if (e4 >= kGateLin)
             {
-                // 2 dB dead band: the slow follower of a steady rectified sine sits ~1.7 dB below the fast one
+                // 2 dB dead band: the slow follower of a steady rectified sine sits ~1.7 dB below the fast
+                // one
                 const float dA = std::max(0.0f, diffDb(e1, e2) - kAttackDeadbandDb);
                 const float dS = std::max(0.0f, diffDb(e4, e3));
                 const float a = std::min(1.0f, dA * (1.0f / 12.0f));

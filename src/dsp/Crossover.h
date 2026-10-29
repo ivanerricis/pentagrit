@@ -36,7 +36,9 @@ public:
 private:
     struct SvfState
     {
-        double ic1 = 0.0, ic2 = 0.0;
+        // Two lanes: the channel pair (2k, 2k+1) is processed together.
+        alignas(16) double ic1[2] = {0.0, 0.0};
+        alignas(16) double ic2[2] = {0.0, 0.0};
     };
 
     struct StageCoefs
@@ -58,8 +60,8 @@ private:
         // [stage]. The first cascade element of the low- and high-pass sides is the same filter on the same
         // input (lp1 provides both), so it is stored and computed once.
         std::array<SvfState, 4> lp1{}, lp2{}, hp2{};
-        std::array<std::array<SvfState, 4>, 3> comp{};     // [band][stage] allpass compensation
-        std::array<SvfState, 4> dry{};                     // dry allpass chain
+        std::array<std::array<SvfState, 4>, 3> comp{}; // [band][stage] allpass compensation
+        std::array<SvfState, 4> dry{};                 // dry allpass chain
     };
 
     static constexpr int kCoefInterval = 32;

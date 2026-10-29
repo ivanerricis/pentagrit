@@ -10,13 +10,16 @@ namespace pentagrit
 {
 inline constexpr float kSilenceDb = -100.0f;
 
-// 2^x for x in about [-120, 120] (clamped). Range reduction to [-0.5, 0.5] and a degree-5 Taylor polynomial of
-// e^(f ln2); relative error < 3e-6 (< 3e-5 dB). Branch free, so loops using it auto-vectorize on baseline SSE2.
+// 2^x for x in about [-120, 120] (clamped). Range reduction to [-0.5, 0.5] and a degree-5 Taylor polynomial
+// of e^(f ln2); relative error < 3e-6 (< 3e-5 dB). Branch free, so loops using it auto-vectorize on baseline
+// SSE2.
 inline float fastExp2(float x) noexcept
 {
-    x = std::min(std::max(x, -120.0f), 120.0f);
-    const int i = static_cast<int>(x + (x >= 0.0f ? 0.5f : -0.5f)); // round to nearest
-    const float f = x - static_cast<float>(i);
+    x = x < -120.0f ? -120.0f : x;
+    x = x > 120.0f ? 120.0f : x;
+    const float r = (x + 12582912.0f) - 12582912.0f; // round to nearest (magic number)
+    const int i = static_cast<int>(r);
+    const float f = x - r;
     float p = 1.54035304e-4f * f + 1.33335581e-3f;
     p = p * f + 9.61812911e-3f;
     p = p * f + 5.55041087e-2f;
@@ -50,27 +53,31 @@ inline float gainToDb(float gain) noexcept
     return gain > 1.0e-5f ? 6.02059991f * fastLog2(gain) : kSilenceDb; // 20 log10(2) * log2(g)
 }
 
-// tanh(x): [7/6] Pade approximant (continued fraction), input clamped to +-5 and output to +-1. Odd, exactly 0 at
-// 0, relative error ~1e-12 near 0, max absolute error 9.7e-5 (reached around |x| = 4.97 where tanh is 0.9999).
+// tanh(x): [7/6] Pade approximant (continued fraction), input clamped to +-5 and output to +-1. Odd, exactly
+// 0 at 0, relative error ~1e-12 near 0, max absolute error 9.7e-5 (reached around |x| = 4.97 where tanh is
+// 0.9999).
 inline float fastTanh(float x) noexcept
 {
-    x = std::min(std::max(x, -5.0f), 5.0f);
+    x = x < -5.0f ? -5.0f : x;
+    x = x > 5.0f ? 5.0f : x;
     const float x2 = x * x;
     const float num = x * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
     const float den = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + 28.0f * x2));
-    return std::min(std::max(num / den, -1.0f), 1.0f);
+    const float y = num / den;
+    return y < -1.0f ? -1.0f : (y > 1.0f ? 1.0f : y);
 }
 
-// sin(pi/2 * u) for any finite u (NaN/Inf map to 0): range reduction to the period [-2, 2], fold to [-1, 1], odd
-// polynomial (Taylor, degree 11). Max absolute error < 1e-7.
+// sin(pi/2 * u) for u in any range (|u| is clamped to 1e5; NaN propagates): range reduction to the period
+// [-2, 2], fold to [-1, 1], odd polynomial (Taylor, degree 11). Max absolute error < 1e-7. Branch free
+// (vectorizes).
 inline float fastSinHalfPi(float u) noexcept
 {
-    u = (u > -1.0e5f && u < 1.0e5f) ? u : 0.0f;
+    u = u < -1.0e5f ? -1.0e5f : u;
+    u = u > 1.0e5f ? 1.0e5f : u;
     const float t = u * 0.25f;
-    const int r = static_cast<int>(t + (t >= 0.0f ? 0.5f : -0.5f));
-    float w = 4.0f * (t - static_cast<float>(r)); // [-2, 2]
-    w = w > 1.0f ? 2.0f - w : w;
-    w = w < -1.0f ? -2.0f - w : w;
+    const float r = (t + 12582912.0f) - 12582912.0f; // round to nearest (magic number)
+    float w = 4.0f * (t - r);                        // [-2, 2]
+    w = w - 2.0f * (w > 1.0f ? w - 1.0f : 0.0f) - 2.0f * (w < -1.0f ? w + 1.0f : 0.0f);
     const float w2 = w * w;
     float p = 5.692172922e-08f * w2 - 3.598843235e-06f;
     p = p * w2 + 1.604411848e-04f;
@@ -91,6 +98,8 @@ inline float timeToCoeff(double seconds, double sampleRate) noexcept
 
 template <typename T> constexpr T clampTo(T v, T lo, T hi) noexcept
 {
-    return std::min(std::max(v, lo), hi);
+    // Written with ternaries (not std::min/max) so MSVC auto-vectorizes loops using it.
+    v = v < lo ? lo : v;
+    return v > hi ? hi : v;
 }
 } // namespace pentagrit

@@ -5,6 +5,9 @@
 #include <cmath>
 #include <numbers>
 #include <type_traits>
+#if defined(_M_X64) || defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 
 namespace pentagrit
 {
@@ -15,47 +18,148 @@ constexpr double kMinHz = 20.0;
 constexpr double kSmoothSeconds = 0.05;
 constexpr double kFlushThreshold = 1.0e-25;
 
-// TPT state variable filter step (Zavalishin). Returns lowpass and bandpass; highpass = x - k*bp - lp.
-template <typename State, typename Coefs>
-inline void svfStep(State& st, const Coefs& c, double x, double& lp, double& bp) noexcept
+// Two doubles processed together (one channel pair). SSE2 is part of the x64 baseline; other targets use a
+// scalar fallback with identical arithmetic.
+#if defined(_M_X64) || defined(__SSE2__)
+struct D2
 {
-    const double v3 = x - st.ic2;
-    const double v1 = c.a1 * st.ic1 + c.a2 * v3;
-    const double v2 = st.ic2 + c.a2 * st.ic1 + c.a3 * v3;
-    st.ic1 = 2.0 * v1 - st.ic1;
-    st.ic2 = 2.0 * v2 - st.ic2;
+    __m128d v;
+};
+inline D2 operator+(D2 a, D2 b) noexcept
+{
+    return {_mm_add_pd(a.v, b.v)};
+}
+inline D2 operator-(D2 a, D2 b) noexcept
+{
+    return {_mm_sub_pd(a.v, b.v)};
+}
+inline D2 operator*(D2 a, D2 b) noexcept
+{
+    return {_mm_mul_pd(a.v, b.v)};
+}
+inline D2 splat(double x) noexcept
+{
+    return {_mm_set1_pd(x)};
+}
+inline D2 make(double lane0, double lane1) noexcept
+{
+    return {_mm_set_pd(lane1, lane0)};
+}
+inline D2 load(const double* p) noexcept
+{
+    return {_mm_load_pd(p)};
+}
+inline void store(double* p, D2 a) noexcept
+{
+    _mm_store_pd(p, a.v);
+}
+inline double lane0(D2 a) noexcept
+{
+    return _mm_cvtsd_f64(a.v);
+}
+inline double lane1(D2 a) noexcept
+{
+    return _mm_cvtsd_f64(_mm_unpackhi_pd(a.v, a.v));
+}
+#else
+struct D2
+{
+    double a, b;
+};
+inline D2 operator+(D2 x, D2 y) noexcept
+{
+    return {x.a + y.a, x.b + y.b};
+}
+inline D2 operator-(D2 x, D2 y) noexcept
+{
+    return {x.a - y.a, x.b - y.b};
+}
+inline D2 operator*(D2 x, D2 y) noexcept
+{
+    return {x.a * y.a, x.b * y.b};
+}
+inline D2 splat(double x) noexcept
+{
+    return {x, x};
+}
+inline D2 make(double l0, double l1) noexcept
+{
+    return {l0, l1};
+}
+inline D2 load(const double* p) noexcept
+{
+    return {p[0], p[1]};
+}
+inline void store(double* p, D2 x) noexcept
+{
+    p[0] = x.a;
+    p[1] = x.b;
+}
+inline double lane0(D2 x) noexcept
+{
+    return x.a;
+}
+inline double lane1(D2 x) noexcept
+{
+    return x.b;
+}
+#endif
+
+struct VCoefs
+{
+    D2 a1, a2, a3;
+};
+
+template <typename Coefs> inline VCoefs vcoefs(const Coefs& c) noexcept
+{
+    return {splat(c.a1), splat(c.a2), splat(c.a3)};
+}
+
+// TPT state variable filter step (Zavalishin). Returns lowpass and bandpass; highpass = x - k*bp - lp.
+template <typename State> inline void svfStep(State& st, const VCoefs& c, D2 x, D2& lp, D2& bp) noexcept
+{
+    const D2 kTwo = splat(2.0);
+    const D2 ic1 = load(st.ic1), ic2 = load(st.ic2);
+    const D2 v3 = x - ic2;
+    const D2 v1 = c.a1 * ic1 + c.a2 * v3;
+    const D2 v2 = ic2 + c.a2 * ic1 + c.a3 * v3;
+    store(st.ic1, kTwo * v1 - ic1);
+    store(st.ic2, kTwo * v2 - ic2);
     lp = v2;
     bp = v1;
 }
 
-template <typename State, typename Coefs> inline double lowpass(State& st, const Coefs& c, double x) noexcept
+template <typename State> inline D2 lowpass(State& st, const VCoefs& c, D2 x) noexcept
 {
-    double lp, bp;
+    D2 lp, bp;
     svfStep(st, c, x, lp, bp);
     return lp;
 }
 
-template <typename State, typename Coefs> inline double highpass(State& st, const Coefs& c, double x) noexcept
+template <typename State> inline D2 highpass(State& st, const VCoefs& c, D2 x) noexcept
 {
-    double lp, bp;
+    D2 lp, bp;
     svfStep(st, c, x, lp, bp);
-    return x - kButterworthK * bp - lp;
+    return x - splat(kButterworthK) * bp - lp;
 }
 
 // 2nd order Butterworth allpass: LP + HP - k*BP = x - 2k*BP.
-template <typename State, typename Coefs> inline double allpass(State& st, const Coefs& c, double x) noexcept
+template <typename State> inline D2 allpass(State& st, const VCoefs& c, D2 x) noexcept
 {
-    double lp, bp;
+    D2 lp, bp;
     svfStep(st, c, x, lp, bp);
-    return x - 2.0 * kButterworthK * bp;
+    return x - splat(2.0 * kButterworthK) * bp;
 }
 
 template <typename State> inline void flush(State& st) noexcept
 {
-    if (std::abs(st.ic1) < kFlushThreshold)
-        st.ic1 = 0.0;
-    if (std::abs(st.ic2) < kFlushThreshold)
-        st.ic2 = 0.0;
+    for (int l = 0; l < 2; ++l)
+    {
+        if (std::abs(st.ic1[l]) < kFlushThreshold)
+            st.ic1[l] = 0.0;
+        if (std::abs(st.ic2[l]) < kFlushThreshold)
+            st.ic2[l] = 0.0;
+    }
 }
 
 template <typename Coefs> void computeCoefs(Coefs& c, double logHz, double rate) noexcept
@@ -72,7 +176,7 @@ void Crossover::prepare(double baseRate, double procRate, int, int numCh)
 {
     baseRate_ = baseRate;
     procRate_ = procRate;
-    channels_.assign(static_cast<size_t>(std::max(numCh, 1)), ChannelState{});
+    channels_.assign(static_cast<size_t>((std::max(numCh, 1) + 1) / 2), ChannelState{});
     effective_ = enforceOrdering(requested_, numBands_, baseRate_);
     updateTargets();
     reset();
@@ -199,67 +303,59 @@ template <typename Fn> void Crossover::forEachChunk(Smoother& s, int numSamples,
 void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& bands) noexcept
 {
     const int numSamples = static_cast<int>(in.getNumSamples());
-    const int numCh = std::min(static_cast<int>(in.getNumChannels()), static_cast<int>(channels_.size()));
+    const int numCh = std::min(static_cast<int>(in.getNumChannels()), static_cast<int>(channels_.size()) * 2);
     const int stages = numBands_ - 1;
 
-    // Processes NC channels starting at ch0 in lock-step so their independent dependency chains overlap.
-    auto run = [&](auto tag, int ch0, int start, int len)
+    // One call handles a channel pair (lanes); a missing second channel is fed zeros and its output dropped.
+    auto run = [&](int ch0, int start, int len)
     {
-        constexpr int NC = decltype(tag)::value;
+        const bool two = ch0 + 1 < numCh;
         const auto& coefs = splitSmoother_.coefs;
-        ChannelState* st[NC];
-        const float* src[NC];
-        float* out[NC][kMaxBands];
-        for (int c = 0; c < NC; ++c)
+        VCoefs vc[4];
+        for (int s = 0; s < stages; ++s)
+            vc[s] = vcoefs(coefs[static_cast<size_t>(s)]);
+        ChannelState& st = channels_[static_cast<size_t>(ch0 / 2)];
+        const float* src0 = in.getChannelPointer(static_cast<size_t>(ch0));
+        const float* src1 = two ? in.getChannelPointer(static_cast<size_t>(ch0 + 1)) : src0;
+        float* out0[kMaxBands];
+        float* out1[kMaxBands];
+        for (int b = 0; b < numBands_; ++b)
         {
-            st[c] = &channels_[static_cast<size_t>(ch0 + c)];
-            src[c] = in.getChannelPointer(static_cast<size_t>(ch0 + c));
-            for (int b = 0; b < numBands_; ++b)
-                out[c][b] = bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0 + c));
+            out0[b] = bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0));
+            out1[b] =
+                two ? bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0 + 1)) : nullptr;
         }
 
         for (int i = start; i < start + len; ++i)
         {
-            double x[NC];
-            for (int c = 0; c < NC; ++c)
-                x[c] = static_cast<double>(src[c][i]);
+            D2 x = make(static_cast<double>(src0[i]), two ? static_cast<double>(src1[i]) : 0.0);
             for (int s = 0; s < stages; ++s)
             {
                 const auto si = static_cast<size_t>(s);
-                const auto& cf = coefs[si];
-                double low[NC], high[NC];
-                for (int c = 0; c < NC; ++c)
-                {
-                    double lp, bp;
-                    svfStep(st[c]->lp1[si], cf, x[c], lp, bp);
-                    const double hp1 = x[c] - kButterworthK * bp - lp;
-                    low[c] = lowpass(st[c]->lp2[si], cf, lp);
-                    high[c] = highpass(st[c]->hp2[si], cf, hp1);
-                }
+                D2 lp, bp;
+                svfStep(st.lp1[si], vc[s], x, lp, bp);
+                const D2 hp1 = x - splat(kButterworthK) * bp - lp;
+                D2 low = lowpass(st.lp2[si], vc[s], lp);
+                const D2 high = highpass(st.hp2[si], vc[s], hp1);
                 // Phase-match this band to the later splits.
                 for (int t = s + 1; t < stages; ++t)
-                    for (int c = 0; c < NC; ++c)
-                        low[c] = allpass(st[c]->comp[si][static_cast<size_t>(t)],
-                                         coefs[static_cast<size_t>(t)], low[c]);
-                for (int c = 0; c < NC; ++c)
-                {
-                    out[c][s][i] = static_cast<float>(low[c]);
-                    x[c] = high[c];
-                }
+                    low = allpass(st.comp[si][static_cast<size_t>(t)], vc[t], low);
+                out0[s][i] = static_cast<float>(lane0(low));
+                if (two)
+                    out1[s][i] = static_cast<float>(lane1(low));
+                x = high;
             }
-            for (int c = 0; c < NC; ++c)
-                out[c][stages][i] = static_cast<float>(x[c]);
+            out0[stages][i] = static_cast<float>(lane0(x));
+            if (two)
+                out1[stages][i] = static_cast<float>(lane1(x));
         }
     };
 
     forEachChunk(splitSmoother_, numSamples,
                  [&](int start, int len)
                  {
-                     int ch = 0;
-                     for (; ch + 1 < numCh; ch += 2)
-                         run(std::integral_constant<int, 2>{}, ch, start, len);
-                     if (ch < numCh)
-                         run(std::integral_constant<int, 1>{}, ch, start, len);
+                     for (int ch = 0; ch < numCh; ch += 2)
+                         run(ch, start, len);
                  });
 
     for (auto& st : channels_)
@@ -279,41 +375,34 @@ void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& 
 void Crossover::processAllpassChain(const juce::dsp::AudioBlock<float>& io) noexcept
 {
     const int numSamples = static_cast<int>(io.getNumSamples());
-    const int numCh = std::min(static_cast<int>(io.getNumChannels()), static_cast<int>(channels_.size()));
+    const int numCh = std::min(static_cast<int>(io.getNumChannels()), static_cast<int>(channels_.size()) * 2);
     const int stages = numBands_ - 1;
 
-    auto run = [&](auto tag, int ch0, int start, int len)
+    auto run = [&](int ch0, int start, int len)
     {
-        constexpr int NC = decltype(tag)::value;
-        const auto& coefs = drySmoother_.coefs;
-        ChannelState* st[NC];
-        float* data[NC];
-        for (int c = 0; c < NC; ++c)
-        {
-            st[c] = &channels_[static_cast<size_t>(ch0 + c)];
-            data[c] = io.getChannelPointer(static_cast<size_t>(ch0 + c));
-        }
+        const bool two = ch0 + 1 < numCh;
+        VCoefs vc[4];
+        for (int s = 0; s < stages; ++s)
+            vc[s] = vcoefs(drySmoother_.coefs[static_cast<size_t>(s)]);
+        ChannelState& st = channels_[static_cast<size_t>(ch0 / 2)];
+        float* d0 = io.getChannelPointer(static_cast<size_t>(ch0));
+        float* d1 = two ? io.getChannelPointer(static_cast<size_t>(ch0 + 1)) : d0;
         for (int i = start; i < start + len; ++i)
         {
-            double x[NC];
-            for (int c = 0; c < NC; ++c)
-                x[c] = static_cast<double>(data[c][i]);
+            D2 x = make(static_cast<double>(d0[i]), two ? static_cast<double>(d1[i]) : 0.0);
             for (int s = 0; s < stages; ++s)
-                for (int c = 0; c < NC; ++c)
-                    x[c] = allpass(st[c]->dry[static_cast<size_t>(s)], coefs[static_cast<size_t>(s)], x[c]);
-            for (int c = 0; c < NC; ++c)
-                data[c][i] = static_cast<float>(x[c]);
+                x = allpass(st.dry[static_cast<size_t>(s)], vc[s], x);
+            d0[i] = static_cast<float>(lane0(x));
+            if (two)
+                d1[i] = static_cast<float>(lane1(x));
         }
     };
 
     forEachChunk(drySmoother_, numSamples,
                  [&](int start, int len)
                  {
-                     int ch = 0;
-                     for (; ch + 1 < numCh; ch += 2)
-                         run(std::integral_constant<int, 2>{}, ch, start, len);
-                     if (ch < numCh)
-                         run(std::integral_constant<int, 1>{}, ch, start, len);
+                     for (int ch = 0; ch < numCh; ch += 2)
+                         run(ch, start, len);
                  });
 
     for (auto& st : channels_)
