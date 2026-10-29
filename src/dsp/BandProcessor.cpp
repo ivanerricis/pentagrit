@@ -30,5 +30,8 @@ void BandProcessor::setSettings(const BandSettings& settings, bool audible, floa
 }
 
 void BandProcessor::process(const juce::dsp::AudioBlock<float>&) noexcept {}
-float BandProcessor::getTransientGainDb() const noexcept { return transient_.getLastGainDb(); }
+float BandProcessor::getTransientGainDb() const noexcept
+{
+    return transient_.getLastGainDb();
+}
 } // namespace pentagrit

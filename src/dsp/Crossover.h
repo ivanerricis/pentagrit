@@ -3,6 +3,7 @@
 
 #include "dsp/DspTypes.h"
 #include <array>
+#include <vector>
 #include <juce_dsp/juce_dsp.h>
 
 namespace pentagrit
@@ -23,7 +24,8 @@ public:
     std::array<float, 4> getEffectiveFrequencies() const noexcept;
 
     // Enforces ascending order with a minimum distance of 1/3 octave (parameter values are not rewritten).
-    static std::array<float, 4> enforceOrdering(std::array<float, 4> hz, int numBands, double baseRate) noexcept;
+    static std::array<float, 4> enforceOrdering(std::array<float, 4> hz, int numBands,
+                                                double baseRate) noexcept;
 
     // Splits `in` into the first numBands blocks of `bands` (same size as `in`).
     void split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& bands) noexcept;
@@ -32,9 +34,46 @@ public:
     void processAllpassChain(const juce::dsp::AudioBlock<float>& io) noexcept;
 
 private:
+    struct SvfState
+    {
+        double ic1 = 0.0, ic2 = 0.0;
+    };
+
+    struct StageCoefs
+    {
+        double a1 = 0.0, a2 = 0.0, a3 = 0.0;
+    };
+
+    // Log-domain frequency smoother, advanced every kCoefInterval samples. One instance drives split(),
+    // another one the dry allpass chain, so both follow the same trajectory when fed the same block sizes.
+    struct Smoother
+    {
+        std::array<double, 4> logHz{};
+        std::array<StageCoefs, 4> coefs{};
+        int counter = 0;
+    };
+
+    struct ChannelState
+    {
+        std::array<std::array<SvfState, 2>, 4> lp{}, hp{}; // [stage][cascade]
+        std::array<std::array<SvfState, 4>, 3> comp{};     // [band][stage] allpass compensation
+        std::array<SvfState, 4> dry{};                     // dry allpass chain
+    };
+
+    static constexpr int kCoefInterval = 32;
+
+    void updateTargets() noexcept;
+    void snap(Smoother& s) const noexcept;
+    void advance(Smoother& s) const noexcept;
+    template <typename Fn> void forEachChunk(Smoother& s, int numSamples, Fn&& fn) noexcept;
+
     double baseRate_ = 44100.0, procRate_ = 44100.0;
     int numBands_ = kMaxBands;
     std::array<float, 4> requested_{120, 1200, 3500, 8000};
     std::array<float, 4> effective_{120, 1200, 3500, 8000};
+    std::array<double, 4> targetLogHz_{};
+    double smoothAlpha_ = 0.0;
+    Smoother splitSmoother_, drySmoother_;
+    std::vector<ChannelState> channels_;
 };
 } // namespace pentagrit

@@ -15,12 +15,19 @@ public:
 
     void setEnabled(bool enabled) noexcept;
     // Measures `ref` (dry) against `wet` and applies the compensation gain to `wet` in place.
-    void process(const juce::dsp::AudioBlock<const float>& ref, const juce::dsp::AudioBlock<float>& wet) noexcept;
+    void process(const juce::dsp::AudioBlock<const float>& ref,
+                 const juce::dsp::AudioBlock<float>& wet) noexcept;
     float getCurrentGainDb() const noexcept;
 
 private:
     double rate_ = 44100.0;
     bool enabled_ = false;
     float currentGainDb_ = 0.0f;
+
+    float powCoeff_ = 0.0f;
+    float gainCoeff_ = 0.0f;
+    float meanRef_ = 0.0f;
+    float meanWet_ = 0.0f;
+    float targetDb_ = 0.0f;
 };
 } // namespace pentagrit

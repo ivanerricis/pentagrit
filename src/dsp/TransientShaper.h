@@ -5,7 +5,7 @@
 
 namespace pentagrit
 {
-// Differential-envelope transient shaper. Owned by WP2.
+// Differential-envelope transient shaper (stereo-linked, zero latency, no lookahead).
 class TransientShaper
 {
 public:
@@ -19,7 +19,14 @@ public:
     float getLastGainDb() const noexcept;
 
 private:
+    void updateCoeffs() noexcept;
+
     double rate_ = 44100.0;
     float attackDb_ = 0, sustainDb_ = 0, speed01_ = 0.5f, lowHintHz_ = 0, lastGainDb_ = 0;
+
+    // coefficients
+    float aFast_ = 0, rE1_ = 0, aE2_ = 0, rE3_ = 0, rE4_ = 0, aGain_ = 0;
+    // state
+    float e1_ = 0, e2_ = 0, e3_ = 0, e4_ = 0, gSmooth_ = 0;
 };
 } // namespace pentagrit
