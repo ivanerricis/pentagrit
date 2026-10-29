@@ -22,5 +22,11 @@ private:
     double rate_ = 44100.0;
     bool enabled_ = false;
     float currentGainDb_ = 0.0f;
+
+    float powCoeff_ = 0.0f;
+    float gainCoeff_ = 0.0f;
+    float meanRef_ = 0.0f;
+    float meanWet_ = 0.0f;
+    float targetDb_ = 0.0f;
 };
 } // namespace pentagrit
