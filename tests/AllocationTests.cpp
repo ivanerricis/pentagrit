@@ -169,9 +169,13 @@ TEST_CASE("The allocation counter sees heap allocations", "[allocation]")
     std::size_t seen = 0;
     {
         ScopedCounter counter;
-        auto* p = new int(3);
+        // Go through the sized operator directly and publish the pointer, so the compiler cannot elide the
+        // allocation (clang on macOS removes a bare `new int(3)` whose result is only deleted).
+        static void* volatile sink;
+        void* p = ::operator new(sizeof(int));
+        sink = p;
         seen = ScopedCounter::count();
-        delete p;
+        ::operator delete(sink);
     }
     CHECK(seen >= 1);
 }

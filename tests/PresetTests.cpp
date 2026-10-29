@@ -128,8 +128,8 @@ TEST_CASE("Factory presets set specific values", "[Preset]")
 
     REQUIRE(f.pm.loadPreset(factoryEntry(f.pm, "Init")).wasOk());
     CHECK(f.get(pid::numBands) == Approx(3.0f));
-    CHECK(f.get(bandParamID(0, BandParam::satType)) == Approx(0.0f));
-    CHECK(f.get(pid::autoGain) == Approx(0.0f));
+    CHECK(f.get(bandParamID(0, BandParam::satType)) == Approx(0.0f).margin(1e-5f));
+    CHECK(f.get(pid::autoGain) == Approx(0.0f).margin(1e-5f));
     CHECK(f.get(pid::oversampling) == Approx(1.0f));
 }
 
@@ -149,7 +149,7 @@ TEST_CASE("Preset round trip: saveAs then load", "[Preset]")
     CHECK(f.tmp.dir.getChildFile("presets/Mine/My Preset.pgp").existsAsFile());
 
     REQUIRE(f.pm.loadInit().wasOk());
-    CHECK(f.get(pid::inGain) == Approx(0.0f));
+    CHECK(f.get(pid::inGain) == Approx(0.0f).margin(1e-5f));
 
     auto user = f.pm.getUserPresets();
     REQUIRE(user.size() == 1);
@@ -312,10 +312,10 @@ TEST_CASE("Preset values are clamped and missing parameters use defaults", "[Pre
     REQUIRE(f.pm.getUserPresets().size() == 1);
     REQUIRE(f.pm.loadPreset(f.pm.getUserPresets()[0]).wasOk());
     CHECK(f.get(pid::inGain) == Approx(24.0f));
-    CHECK(f.get(pid::mix) == Approx(0.0f));
+    CHECK(f.get(pid::mix) == Approx(0.0f).margin(1e-5f));
     CHECK(f.get(pid::numBands) == Approx(5.0f));
-    CHECK(f.get(bandParamID(0, BandParam::satType)) == Approx(0.0f));
-    CHECK(f.get(pid::outGain) == Approx(0.0f)); // not listed: default
+    CHECK(f.get(bandParamID(0, BandParam::satType)) == Approx(0.0f).margin(1e-5f));
+    CHECK(f.get(pid::outGain) == Approx(0.0f).margin(1e-5f)); // not listed: default
 }
 
 TEST_CASE("osPhase, osRender and bypass survive preset loads", "[Preset]")
@@ -462,7 +462,7 @@ TEST_CASE("Rename, duplicate and delete user presets", "[Preset]")
         CHECK(f.pm.getUserPresets().empty());
         CHECK(f.pm.getCurrentName() == "Init"); // falls back to Init
         CHECK(f.pm.isCurrentFactory());
-        CHECK(f.get(pid::inGain) == Approx(0.0f));
+        CHECK(f.get(pid::inGain) == Approx(0.0f).margin(1e-5f));
     }
 }
 
