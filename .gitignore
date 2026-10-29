@@ -6,3 +6,5 @@ tools/
 CMakeUserPresets.json
 *.user
 .DS_Store
+
+snap/

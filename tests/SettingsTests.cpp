@@ -451,7 +451,7 @@ TEST_CASE("Editor with preset bar and settings overlay", "[gui][settings][Editor
     CHECK(editor.getPresetBar()->getParentComponent() == &editor.presetSlot());
     CHECK(editor.presetSlot().getWidth() >= 300); // fits at the 1100 px base width
     CHECK(editor.getPresetBar()->getWidth() == editor.presetSlot().getWidth());
-    CHECK(editor.getPresetBar()->isShowing() == editor.getPresetBar()->isVisible());
+    CHECK(editor.getPresetBar()->isVisible());
 
     auto before = snapshot(editor, "editor_full_presetbar");
     CHECK(distinctColours(before) > 30);

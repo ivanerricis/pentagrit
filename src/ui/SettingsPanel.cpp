@@ -502,7 +502,10 @@ void SettingsPanel::updateLatencyText()
     const auto os = apvts.getParameter(pid::oversampling)->getCurrentValueAsText();
     const auto phase = apvts.getParameter(pid::osPhase)->getCurrentValueAsText().toLowerCase();
     juce::String text = "Live (OS " + os + ", " + phase + "): ";
-    text << (sr > 0.0 ? juce::String(lat * 1000.0 / sr, 2) + " ms  (" : juce::String("(")) << lat << " smp)";
+    if (sr > 0.0)
+        text << juce::String(lat * 1000.0 / sr, 2) << " ms  (" << lat << " smp)";
+    else
+        text << lat << " smp";
     if (latencyLabel_->getText() != text)
         latencyLabel_->setText(text, juce::dontSendNotification);
 }
