@@ -53,3 +53,21 @@ Build a `.pkg` with `pkgbuild`/`productbuild`, sign it with `--sign "Developer I
 
 - Never commit certificates or passwords; use repository secrets only, and delete the temporary keychain at the end of the job.
 - Re-run `auval` after signing.
+
+## Signing the `.pkg` installer
+
+`scripts/ci/make_installer_macos.sh` builds `Pentagrit-vX.Y.Z-macos.pkg` unsigned by default. To sign it, export the Developer ID **Installer** certificate (separate from the Application one) and set, in the macOS build step:
+
+```
+MACOS_INSTALLER_CERT="Developer ID Installer: <Name> (<TEAMID>)"   # enables productbuild --sign
+MACOS_INSTALLER_KEYCHAIN=build.keychain                            # optional
+```
+
+Then notarize and staple the package itself:
+
+```
+xcrun notarytool submit Pentagrit-vX.Y.Z-macos.pkg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+xcrun stapler staple Pentagrit-vX.Y.Z-macos.pkg
+```
+
+Bundles inside the `.pkg` should be Developer ID signed first (steps above), since the installer copies the signed bundles from the zip.
