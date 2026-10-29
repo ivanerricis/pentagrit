@@ -9,7 +9,7 @@ Merged: scaffold, crossover (WP1), transient shaper (WP2), saturator + auto-gain
 WP9 (settings panel + preset bar wired into the editor, PR #12) and WP10 (CPU optimisation, ~2x faster at 4x/8x oversampling, PR #13) are merged on `main`. 95+ tests pass; CI (Windows + Linux build, tests, pluginval 10, clang-format 18) is green; clang-tidy is advisory and currently reports warnings. The repository is now PUBLIC (AGPL-3.0-or-later), so GitHub Actions minutes are free.
 
 ## Decisions taken
-- Name Pentagrit; version path v0.1.0-rc1 -> v0.1.0 -> v1.0.0; AGPL-3.0-or-later; repo private for now.
+- Name Pentagrit; version path v0.1.0-rc1 -> v0.1.0 -> v1.0.0; AGPL-3.0-or-later; repo made public on 2026-10-29 (commercial closed-source distribution would now need a JUCE commercial licence and a relicense).
 - Defaults: 3 bands, crossovers 120/1200/3500/8000 Hz, oversampling 2x. 63 parameters; `osPhase` and `osRender` are non-automatable and saved with the project; presets never overwrite `osPhase`, `osRender`, `bypass`.
 - Auto-gain compensates input gain (reference is dry before inGain): keep.
 - Parameter IDs are immutable (CLAP hashes them).
@@ -20,8 +20,8 @@ WP9 (settings panel + preset bar wired into the editor, PR #12) and WP10 (CPU op
 3. Test in a real host (Reaper): zoom via `setScaleFactor`, crossover drag, latency compensation, meters with running audio, CPU at 4x/8x.
 4. Run pluginval locally; try the macOS CI job (label `ci:macos`) and check AU/auval.
 5. Dry-run release `v0.1.0-rc1` (tag must equal CMake version), then `v0.1.0`.
-6. Decide licensing before any public binary: make the repo public (AGPL) or buy a commercial JUCE licence.
-7. Branch protection: free private repos cannot enforce rulesets; see `docs/BRANCH_PROTECTION.md`.
+6. Verify the product name "Pentagrit" is free of trademark conflicts before a public release; enable the update check (repo is public now, GitHub Releases API is reachable).
+7. Enable branch protection on `main` now that the repo is public; see `docs/BRANCH_PROTECTION.md` (required check names: `clang-format 18`, `PR title (conventional commit)`, `build / build (windows)`, `build / build (linux)`).
 8. macOS signing/notarisation (phase 2, `docs/MACOS_SIGNING.md`).
 9. Cleanup: remove stale worktrees (`git worktree list`, `git worktree remove`) and merged branches.
 
