@@ -7,6 +7,8 @@
 #include "ui/Footer.h"
 #include "ui/GlobalPanel.h"
 #include "ui/PentagritLookAndFeel.h"
+#include "ui/PresetBar.h"
+#include "ui/SettingsPanel.h"
 #include "ui/TopBar.h"
 #include "ui/UiOptions.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -16,7 +18,9 @@ namespace pentagrit
 // Custom editor (WP5b). All content lives in `content()`, laid out at the base size (1100 x 680 full, 1100 x
 // 540 compact) and scaled uniformly to the editor size, so the editor can be resized with a fixed aspect
 // ratio. Zoom is applied with setScaleFactor() (see setUiOptions).
-class PentagritAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
+class PentagritAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                            private juce::Timer,
+                                            private juce::ChangeListener
 {
 public:
     explicit PentagritAudioProcessorEditor(PentagritAudioProcessor& processor);
@@ -26,10 +30,9 @@ public:
     void setUiOptions(const ui::UiOptions& options);
     const ui::UiOptions& getUiOptions() const noexcept { return options_; }
 
-    // Hooks for the other work packages.
-    // WP8: add the PresetBar as a child of presetSlot(); it is stretched over the slot.
+    // The PresetBar is a child of presetSlot() (stretched over the slot).
     juce::Component& presetSlot() noexcept { return topBar_.presetSlot(); }
-    // WP9: assign to open the settings panel (the gear button in the top bar).
+    // Called by the gear button in the top bar (opens/closes the settings panel).
     std::function<void()>& onSettingsClicked() noexcept { return topBar_.onSettingsClicked; }
     // Parent for overlays (settings panel): same coordinate system as the layout (base size, scaled with the
     // editor).
@@ -38,6 +41,13 @@ public:
     ui::Footer& getFooter() noexcept { return footer_; }
     // Shows `text` in the footer for `ms` milliseconds (preset toasts).
     void showToast(const juce::String& text, int ms = 2600);
+
+    // Settings overlay (the gear button toggles it; Esc / Done / click outside close it).
+    void openSettings();
+    void closeSettings();
+    bool isSettingsOpen() const noexcept { return settingsPanel_ != nullptr && settingsPanel_->isVisible(); }
+    ui::SettingsPanel* getSettingsPanel() noexcept { return settingsPanel_.get(); }
+    PresetBar* getPresetBar() noexcept { return presetBar_.get(); }
 
     // Inspection (tests).
     int numBands() const noexcept { return numBands_; }
@@ -67,6 +77,7 @@ private:
     };
 
     void timerCallback() override;
+    void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void layoutContent();
     void applyNumBands(int n, bool fromUser);
     void applyThemeToChildren();
@@ -89,6 +100,8 @@ private:
     std::unique_ptr<juce::ParameterAttachment> numBandsAttachment_;
     std::unique_ptr<juce::TooltipWindow> tooltip_;
     juce::ComponentBoundsConstrainer constrainer_;
+    std::unique_ptr<PresetBar> presetBar_;
+    std::unique_ptr<ui::SettingsPanel> settingsPanel_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PentagritAudioProcessorEditor)
 };

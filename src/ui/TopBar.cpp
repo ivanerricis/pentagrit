@@ -68,25 +68,25 @@ void TopBar::resized()
     const int h = 26;
     auto centreV = [&](juce::Rectangle<int> r) { return r.withSizeKeepingCentre(r.getWidth(), h); };
 
+    // Tight gaps so that the preset bar (about 324 px) fits next to the selectors at the 1100 px base width.
+    constexpr int gap = 6;
     b.removeFromLeft(36 + 8 + 92 + 8); // logo + wordmark
-    auto right = b;
 
     gear_.setBounds(juce::Rectangle<int>(30, 30).withCentre({b.getRight() - 15, getHeight() / 2}));
-    b.removeFromRight(30 + 8);
-    bypass_.setBounds(centreV(b.removeFromRight(70)));
-    b.removeFromRight(8);
-    autoGain_.setBounds(centreV(b.removeFromRight(84)));
-    b.removeFromRight(8);
+    b.removeFromRight(30 + gap);
+    bypass_.setBounds(centreV(b.removeFromRight(66)));
+    b.removeFromRight(gap);
+    autoGain_.setBounds(centreV(b.removeFromRight(78)));
+    b.removeFromRight(gap);
     latencyArea_ = b.removeFromRight(112);
-    b.removeFromRight(8);
-    os_.setBounds(centreV(b.removeFromRight(4 * 32 + 4)));
-    osLabelArea_ = b.removeFromRight(26);
-    b.removeFromRight(8);
-    bands_.setBounds(centreV(b.removeFromRight(4 * 28 + 4)));
-    bandsLabelArea_ = b.removeFromRight(40);
-    b.removeFromRight(8);
+    b.removeFromRight(gap);
+    os_.setBounds(centreV(b.removeFromRight(4 * 28 + 4)));
+    osLabelArea_ = b.removeFromRight(22);
+    b.removeFromRight(gap);
+    bands_.setBounds(centreV(b.removeFromRight(4 * 26 + 4)));
+    bandsLabelArea_ = b.removeFromRight(36);
+    b.removeFromRight(gap);
     presetSlot_.setBounds(b.withSizeKeepingCentre(juce::jmax(0, b.getWidth()), 30));
-    juce::ignoreUnused(right);
 }
 
 void TopBar::drawLogoMark(juce::Graphics& g, juce::Rectangle<float> area, const Palette& p)
