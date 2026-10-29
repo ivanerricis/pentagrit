@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Punchy Kick" category="Drums" author="Pentagrit" description="Low and low-mid attack, light tanh on the beater">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="3"/>
+    <PARAM id="xover1" value="100"/>
+    <PARAM id="xover2" value="1000"/>
+    <PARAM id="autoGain" value="1"/>
+    <PARAM id="b1_attack" value="6"/>
+    <PARAM id="b2_attack" value="9"/>
+    <PARAM id="b2_satType" value="1"/>
+    <PARAM id="b2_drive" value="4"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>

@@ -31,8 +31,7 @@ std::vector<float> makeBurst(double fs, double total)
     return x;
 }
 
-Run runShaper(const std::vector<float>& in, double fs, float atk, float sus, float speed,
-              int block = 256)
+Run runShaper(const std::vector<float>& in, double fs, float atk, float sus, float speed, int block = 256)
 {
     pentagrit::TransientShaper ts;
     ts.prepare(fs, block, 1);
@@ -78,7 +77,10 @@ Run runShaperPerSample(const std::vector<float>& in, double fs, float atk, float
     return r;
 }
 
-size_t idx(const Run& r, double t) { return static_cast<size_t>(t * r.fs); }
+size_t idx(const Run& r, double t)
+{
+    return static_cast<size_t>(t * r.fs);
+}
 
 double peakDb(const std::vector<float>& v, size_t a, size_t b)
 {
@@ -132,7 +134,8 @@ TEST_CASE("Steady sine settles to unity gain", "[transient]")
 TEST_CASE("Faster speed shortens the boosted span", "[transient]")
 {
     const auto in = makeBurst(48000.0, 0.6);
-    auto span = [&](float speed) {
+    auto span = [&](float speed)
+    {
         const auto r = runShaperPerSample(in, 48000.0, 12.0f, 0.0f, speed);
         size_t n = 0;
         for (size_t i = idx(r, kT0); i < idx(r, kT0 + 0.3); ++i)
@@ -155,7 +158,8 @@ TEST_CASE("Rate independence: 4x processing rate matches 1x", "[transient]")
         for (double t = 0.19; t < 0.55; t += 0.01)
         {
             // compare the smoothed gain (max over 1 ms window)
-            auto win = [&](const Run& r) {
+            auto win = [&](const Run& r)
+            {
                 float m = -100, lo = 100;
                 for (size_t i = idx(r, t); i < idx(r, t + 0.001); ++i)
                 {

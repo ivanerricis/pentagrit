@@ -37,6 +37,14 @@ juce_add_binary_data(PentagritUiAssets
     resources/ui/fonts/IBMPlexMono-Regular.ttf
     resources/ui/fonts/IBMPlexMono-Medium.ttf)
 
+# ---- Factory presets embedded as binary data (resources/presets/*.xml) ----
+file(GLOB PENTAGRIT_PRESET_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/presets/*.xml")
+juce_add_binary_data(PentagritPresetData
+  HEADER_NAME PentagritPresetData.h
+  NAMESPACE PentagritPresetData
+  SOURCES ${PENTAGRIT_PRESET_FILES})
+set_target_properties(PentagritPresetData PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 add_library(PentagritCore INTERFACE)
 target_sources(PentagritCore INTERFACE ${PENTAGRIT_CORE_SOURCES})
 target_include_directories(PentagritCore INTERFACE
@@ -44,6 +52,7 @@ target_include_directories(PentagritCore INTERFACE
   "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(PentagritCore INTERFACE
   PentagritCompilerSettings
+  PentagritPresetData
   juce::juce_audio_utils
   juce::juce_dsp
   PentagritUiAssets)

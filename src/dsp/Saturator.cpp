@@ -74,24 +74,24 @@ float Saturator::shape(SatType type, float u) noexcept
 {
     switch (type)
     {
-    case SatType::off:
-        return u;
-    case SatType::tanh:
-        return std::tanh(u);
-    case SatType::softClip:
-    {
-        const float v = clampTo(u, -1.0f, 1.0f);
-        return 1.5f * (v - v * v * v * (1.0f / 3.0f));
-    }
-    case SatType::tube:
-    {
-        static const float offset = std::tanh(0.25f);
-        return std::tanh(u + 0.25f) - offset;
-    }
-    case SatType::wavefold:
-        return std::sin(kPiHalf * u);
-    case SatType::hardClip:
-        return clampTo(u, -1.0f, 1.0f);
+        case SatType::off:
+            return u;
+        case SatType::tanh:
+            return std::tanh(u);
+        case SatType::softClip:
+        {
+            const float v = clampTo(u, -1.0f, 1.0f);
+            return 1.5f * (v - v * v * v * (1.0f / 3.0f));
+        }
+        case SatType::tube:
+        {
+            static const float offset = std::tanh(0.25f);
+            return std::tanh(u + 0.25f) - offset;
+        }
+        case SatType::wavefold:
+            return std::sin(kPiHalf * u);
+        case SatType::hardClip:
+            return clampTo(u, -1.0f, 1.0f);
     }
     return u;
 }

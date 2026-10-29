@@ -32,9 +32,15 @@ void AutoGain::reset() noexcept
     targetDb_ = 0.0f;
 }
 
-void AutoGain::setEnabled(bool enabled) noexcept { enabled_ = enabled; }
+void AutoGain::setEnabled(bool enabled) noexcept
+{
+    enabled_ = enabled;
+}
 
-float AutoGain::getCurrentGainDb() const noexcept { return currentGainDb_; }
+float AutoGain::getCurrentGainDb() const noexcept
+{
+    return currentGainDb_;
+}
 
 void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
                        const juce::dsp::AudioBlock<float>& wet) noexcept

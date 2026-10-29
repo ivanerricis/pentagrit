@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Bass Grit" category="Bass" author="Pentagrit" description="Tube grit on the mids, clean sub">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="3"/>
+    <PARAM id="xover1" value="80"/>
+    <PARAM id="xover2" value="700"/>
+    <PARAM id="b2_satType" value="3"/>
+    <PARAM id="b2_drive" value="12"/>
+    <PARAM id="b2_mix" value="0.7"/>
+    <PARAM id="b3_satType" value="3"/>
+    <PARAM id="b3_drive" value="12"/>
+    <PARAM id="b3_mix" value="0.7"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>
