@@ -123,3 +123,30 @@ TEST_CASE("snapshot() reflects parameter values", "[parameters]")
     CHECK(s.bands[1].solo);
     CHECK_FALSE(s.bands[0].solo);
 }
+
+TEST_CASE("snapshot() maps the render oversampling choice", "[parameters]")
+{
+    PentagritAudioProcessor proc;
+    auto& apvts = proc.getAPVTS();
+    ParamRefs refs(apvts);
+
+    auto setChoice = [&apvts](const char* id, float value)
+    {
+        auto* p = apvts.getParameter(id);
+        p->setValueNotifyingHost(p->convertTo0to1(value));
+    };
+
+    auto s = refs.snapshot();
+    CHECK(s.osRenderSame);
+    CHECK(s.osPhase == OSPhase::linear);
+    CHECK(s.os == OSFactor::x2);
+    CHECK(s.numBands == 3);
+
+    setChoice(pid::osRender, 1.0f);
+    s = refs.snapshot();
+    CHECK_FALSE(s.osRenderSame);
+    CHECK(s.osRender == OSFactor::x2);
+
+    setChoice(pid::osRender, 2.0f);
+    CHECK(refs.snapshot().osRender == OSFactor::x4);
+}

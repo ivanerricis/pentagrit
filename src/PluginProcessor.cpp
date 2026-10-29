@@ -30,6 +30,7 @@ const juce::String PentagritAudioProcessor::getName() const
 void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate_ = sampleRate;
+    engine_.setNonRealtime(isNonRealtime());
     engine_.prepare(sampleRate, samplesPerBlock, juce::jmax(1, getTotalNumOutputChannels()));
     engine_.setSettings(params_.snapshot());
     setLatencySamples(engine_.getLatencySamples());
@@ -52,6 +53,9 @@ void PentagritAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     for (int ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch)
         buffer.clear(ch, 0, buffer.getNumSamples());
 
+    // Settings (incl. the live/render oversampling factor) are applied before the block; a factor, phase or
+    // band count change reconfigures the engine and changes the latency, which is reported below.
+    engine_.setNonRealtime(isNonRealtime());
     engine_.setSettings(params_.snapshot());
     engine_.process(buffer);
 
