@@ -55,7 +55,9 @@ private:
 
     struct ChannelState
     {
-        std::array<std::array<SvfState, 2>, 4> lp{}, hp{}; // [stage][cascade]
+        // [stage]. The first cascade element of the low- and high-pass sides is the same filter on the same
+        // input (lp1 provides both), so it is stored and computed once.
+        std::array<SvfState, 4> lp1{}, lp2{}, hp2{};
         std::array<std::array<SvfState, 4>, 3> comp{};     // [band][stage] allpass compensation
         std::array<SvfState, 4> dry{};                     // dry allpass chain
     };

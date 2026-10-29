@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <type_traits>
 
 namespace pentagrit
 {
@@ -201,48 +202,74 @@ void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& 
     const int numCh = std::min(static_cast<int>(in.getNumChannels()), static_cast<int>(channels_.size()));
     const int stages = numBands_ - 1;
 
+    // Processes NC channels starting at ch0 in lock-step so their independent dependency chains overlap.
+    auto run = [&](auto tag, int ch0, int start, int len)
+    {
+        constexpr int NC = decltype(tag)::value;
+        const auto& coefs = splitSmoother_.coefs;
+        ChannelState* st[NC];
+        const float* src[NC];
+        float* out[NC][kMaxBands];
+        for (int c = 0; c < NC; ++c)
+        {
+            st[c] = &channels_[static_cast<size_t>(ch0 + c)];
+            src[c] = in.getChannelPointer(static_cast<size_t>(ch0 + c));
+            for (int b = 0; b < numBands_; ++b)
+                out[c][b] = bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0 + c));
+        }
+
+        for (int i = start; i < start + len; ++i)
+        {
+            double x[NC];
+            for (int c = 0; c < NC; ++c)
+                x[c] = static_cast<double>(src[c][i]);
+            for (int s = 0; s < stages; ++s)
+            {
+                const auto si = static_cast<size_t>(s);
+                const auto& cf = coefs[si];
+                double low[NC], high[NC];
+                for (int c = 0; c < NC; ++c)
+                {
+                    double lp, bp;
+                    svfStep(st[c]->lp1[si], cf, x[c], lp, bp);
+                    const double hp1 = x[c] - kButterworthK * bp - lp;
+                    low[c] = lowpass(st[c]->lp2[si], cf, lp);
+                    high[c] = highpass(st[c]->hp2[si], cf, hp1);
+                }
+                // Phase-match this band to the later splits.
+                for (int t = s + 1; t < stages; ++t)
+                    for (int c = 0; c < NC; ++c)
+                        low[c] = allpass(st[c]->comp[si][static_cast<size_t>(t)],
+                                         coefs[static_cast<size_t>(t)], low[c]);
+                for (int c = 0; c < NC; ++c)
+                {
+                    out[c][s][i] = static_cast<float>(low[c]);
+                    x[c] = high[c];
+                }
+            }
+            for (int c = 0; c < NC; ++c)
+                out[c][stages][i] = static_cast<float>(x[c]);
+        }
+    };
+
     forEachChunk(splitSmoother_, numSamples,
                  [&](int start, int len)
                  {
-                     const auto& coefs = splitSmoother_.coefs;
-                     for (int ch = 0; ch < numCh; ++ch)
-                     {
-                         auto& st = channels_[static_cast<size_t>(ch)];
-                         const float* src = in.getChannelPointer(static_cast<size_t>(ch));
-                         std::array<float*, kMaxBands> out{};
-                         for (int b = 0; b < numBands_; ++b)
-                             out[static_cast<size_t>(b)] =
-                                 bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch));
-
-                         for (int i = start; i < start + len; ++i)
-                         {
-                             double x = static_cast<double>(src[i]);
-                             for (int s = 0; s < stages; ++s)
-                             {
-                                 const auto si = static_cast<size_t>(s);
-                                 const auto& c = coefs[si];
-                                 double low = lowpass(st.lp[si][1], c, lowpass(st.lp[si][0], c, x));
-                                 const double high = highpass(st.hp[si][1], c, highpass(st.hp[si][0], c, x));
-                                 // Phase-match this band to the later splits.
-                                 for (int t = s + 1; t < stages; ++t)
-                                     low = allpass(st.comp[si][static_cast<size_t>(t)],
-                                                   coefs[static_cast<size_t>(t)], low);
-                                 out[si][i] = static_cast<float>(low);
-                                 x = high;
-                             }
-                             out[static_cast<size_t>(stages)][i] = static_cast<float>(x);
-                         }
-                     }
+                     int ch = 0;
+                     for (; ch + 1 < numCh; ch += 2)
+                         run(std::integral_constant<int, 2>{}, ch, start, len);
+                     if (ch < numCh)
+                         run(std::integral_constant<int, 1>{}, ch, start, len);
                  });
 
     for (auto& st : channels_)
     {
-        for (auto& a : st.lp)
-            for (auto& f : a)
-                flush(f);
-        for (auto& a : st.hp)
-            for (auto& f : a)
-                flush(f);
+        for (auto& f : st.lp1)
+            flush(f);
+        for (auto& f : st.lp2)
+            flush(f);
+        for (auto& f : st.hp2)
+            flush(f);
         for (auto& a : st.comp)
             for (auto& f : a)
                 flush(f);
@@ -255,23 +282,38 @@ void Crossover::processAllpassChain(const juce::dsp::AudioBlock<float>& io) noex
     const int numCh = std::min(static_cast<int>(io.getNumChannels()), static_cast<int>(channels_.size()));
     const int stages = numBands_ - 1;
 
+    auto run = [&](auto tag, int ch0, int start, int len)
+    {
+        constexpr int NC = decltype(tag)::value;
+        const auto& coefs = drySmoother_.coefs;
+        ChannelState* st[NC];
+        float* data[NC];
+        for (int c = 0; c < NC; ++c)
+        {
+            st[c] = &channels_[static_cast<size_t>(ch0 + c)];
+            data[c] = io.getChannelPointer(static_cast<size_t>(ch0 + c));
+        }
+        for (int i = start; i < start + len; ++i)
+        {
+            double x[NC];
+            for (int c = 0; c < NC; ++c)
+                x[c] = static_cast<double>(data[c][i]);
+            for (int s = 0; s < stages; ++s)
+                for (int c = 0; c < NC; ++c)
+                    x[c] = allpass(st[c]->dry[static_cast<size_t>(s)], coefs[static_cast<size_t>(s)], x[c]);
+            for (int c = 0; c < NC; ++c)
+                data[c][i] = static_cast<float>(x[c]);
+        }
+    };
+
     forEachChunk(drySmoother_, numSamples,
                  [&](int start, int len)
                  {
-                     const auto& coefs = drySmoother_.coefs;
-                     for (int ch = 0; ch < numCh; ++ch)
-                     {
-                         auto& st = channels_[static_cast<size_t>(ch)];
-                         float* data = io.getChannelPointer(static_cast<size_t>(ch));
-                         for (int i = start; i < start + len; ++i)
-                         {
-                             double x = static_cast<double>(data[i]);
-                             for (int s = 0; s < stages; ++s)
-                                 x = allpass(st.dry[static_cast<size_t>(s)], coefs[static_cast<size_t>(s)],
-                                             x);
-                             data[i] = static_cast<float>(x);
-                         }
-                     }
+                     int ch = 0;
+                     for (; ch + 1 < numCh; ch += 2)
+                         run(std::integral_constant<int, 2>{}, ch, start, len);
+                     if (ch < numCh)
+                         run(std::integral_constant<int, 1>{}, ch, start, len);
                  });
 
     for (auto& st : channels_)

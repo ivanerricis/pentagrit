@@ -14,23 +14,12 @@ constexpr float kFloor = 1.0e-9f;        // follower floor (-180 dBFS), keeps ev
 constexpr float kDbPerLog2 = 6.0205999f; // 20*log10(2)
 constexpr float kAttackDeadbandDb = 2.0f;
 constexpr float kGateLin = 3.1622777e-4f; // -70 dBFS
+constexpr int kMaxCtrlInterval = 32;
 
-// Fast log2 approximation (polynomial on the mantissa), error < ~0.01 dB-equivalent.
-inline float fastLog2(float x) noexcept
+// dB difference between two follower values (ratio form: one log instead of two).
+inline float diffDb(float hi, float lo) noexcept
 {
-    const auto bits = std::bit_cast<std::uint32_t>(x);
-    const float e = static_cast<float>(static_cast<int>((bits >> 23) & 0xff) - 127);
-    const auto mb = (bits & 0x007fffffu) | 0x3f800000u;
-    const float m = std::bit_cast<float>(mb); // [1,2)
-    const float t = m - 1.0f;
-    // minimax-style cubic for log2(1+t)
-    const float p = t * (1.4425449f + t * (-0.7181452f + t * (0.2780930f - t * 0.0640930f)));
-    return e + p;
-}
-
-inline float toDb(float x) noexcept
-{
-    return kDbPerLog2 * fastLog2(std::max(x, kFloor));
+    return kDbPerLog2 * fastLog2(std::max(hi, kFloor) / std::max(lo, kFloor));
 }
 } // namespace
 
@@ -51,6 +40,9 @@ void TransientShaper::reset() noexcept
     e1_ = e2_ = e3_ = e4_ = 0.0f;
     gSmooth_ = 0.0f;
     lastGainDb_ = 0.0f;
+    lin_ = linTarget_ = 1.0f;
+    linStep_ = 0.0f;
+    ctrlLeft_ = 0;
 }
 
 void TransientShaper::updateCoeffs() noexcept
@@ -67,6 +59,11 @@ void TransientShaper::updateCoeffs() noexcept
     rE3_ = timeToCoeff(r3, rate_);
     rE4_ = timeToCoeff(r4, rate_);
     aGain_ = timeToCoeff(0.001, rate_);
+
+    // ~12 kHz control rate (83 us), never coarser than 8 samples.
+    ctrlInterval_ = clampTo(static_cast<int>(rate_ / 12000.0 + 0.5), 8, kMaxCtrlInterval);
+    aGainCtrl_ = timeToCoeff(0.001, rate_ / ctrlInterval_);
+    ctrlLeft_ = std::min(ctrlLeft_, ctrlInterval_);
 }
 
 void TransientShaper::setParameters(float attackDb, float sustainDb, float speed01) noexcept
@@ -103,7 +100,9 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
         ch[c] = block.getChannelPointer(c);
 
     float e1 = e1_, e2 = e2_, e3 = e3_, e4 = e4_, g = gSmooth_;
-    const float aF = aFast_, aS = aE2_, r1 = rE1_, r3 = rE3_, r4 = rE4_, ag = aGain_;
+    float lin = lin_, linStep = linStep_;
+    int left = ctrlLeft_;
+    const float aF = aFast_, aS = aE2_, r1 = rE1_, r3 = rE3_, r4 = rE4_;
     const float atk = attackDb_, sus = sustainDb_;
 
     auto follow = [](float e, float x, float a, float r) noexcept
@@ -112,43 +111,68 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
         return c * e + (1.0f - c) * x;
     };
 
-    for (size_t i = 0; i < n; ++i)
+    float xs[kMaxCtrlInterval];
+    size_t i = 0;
+    while (i < n)
     {
-        float x = 0.0f;
-        for (size_t c = 0; c < nc; ++c)
+        if (left == 0)
         {
-            const float v = std::abs(ch[c][i]);
-            x = v > x ? v : x;
+            // Control tick: map the follower state to a target gain and ramp towards it.
+            float gT = 0.0f;
+            if (e4 >= kGateLin)
+            {
+                // 2 dB dead band: the slow follower of a steady rectified sine sits ~1.7 dB below the fast one
+                const float dA = std::max(0.0f, diffDb(e1, e2) - kAttackDeadbandDb);
+                const float dS = std::max(0.0f, diffDb(e4, e3));
+                const float a = std::min(1.0f, dA * (1.0f / 12.0f));
+                const float s = std::min(1.0f, dS * (1.0f / 12.0f));
+                gT = clampTo(atk * a + sus * s, -36.0f, 24.0f);
+            }
+            g = aGainCtrl_ * g + (1.0f - aGainCtrl_) * gT;
+            g = std::abs(g) < 1.0e-9f ? 0.0f : g;
+            linTarget_ = dbToGain(g);
+            left = ctrlInterval_;
+            linStep = (linTarget_ - lin) / static_cast<float>(left);
         }
-        if (!(x < 1.0e6f)) // NaN/Inf guard
-            x = 0.0f;
 
-        e1 = follow(e1, x, aF, r1);
-        e2 = follow(e2, x, aS, r1);
-        e3 = follow(e3, x, aF, r3);
-        e4 = follow(e4, x, aF, r4);
+        const size_t len = std::min(static_cast<size_t>(left), n - i);
+
+        // Rectified, channel-linked detector input (vectorizable).
+        for (size_t k = 0; k < len; ++k)
+            xs[k] = std::abs(ch[0][i + k]);
+        for (size_t c = 1; c < nc; ++c)
+            for (size_t k = 0; k < len; ++k)
+                xs[k] = std::max(xs[k], std::abs(ch[c][i + k]));
+
+        for (size_t k = 0; k < len; ++k)
+        {
+            float x = xs[k];
+            if (!(x < 1.0e6f)) // NaN/Inf guard
+                x = 0.0f;
+            e1 = follow(e1, x, aF, r1);
+            e2 = follow(e2, x, aS, r1);
+            e3 = follow(e3, x, aF, r3);
+            e4 = follow(e4, x, aF, r4);
+        }
         // flush denormals
         e1 = e1 < 1.0e-20f ? 0.0f : e1;
         e2 = e2 < 1.0e-20f ? 0.0f : e2;
         e3 = e3 < 1.0e-20f ? 0.0f : e3;
         e4 = e4 < 1.0e-20f ? 0.0f : e4;
 
-        float gT = 0.0f;
-        if (e4 >= kGateLin)
-        {
-            // 2 dB dead band: the slow follower of a steady rectified sine sits ~1.7 dB below the fast one
-            const float dA = std::max(0.0f, toDb(e1) - toDb(e2) - kAttackDeadbandDb);
-            const float dS = std::max(0.0f, toDb(e4) - toDb(e3));
-            const float a = std::min(1.0f, dA * (1.0f / 12.0f));
-            const float s = std::min(1.0f, dS * (1.0f / 12.0f));
-            gT = clampTo(atk * a + sus * s, -36.0f, 24.0f);
-        }
-        g = ag * g + (1.0f - ag) * gT;
-        g = std::abs(g) < 1.0e-12f ? 0.0f : g;
-
-        const float lin = dbToGain(g);
         for (size_t c = 0; c < nc; ++c)
-            ch[c][i] *= lin;
+        {
+            float* d = ch[c] + i;
+            float l = lin;
+            for (size_t k = 0; k < len; ++k)
+            {
+                l += linStep;
+                d[k] *= l;
+            }
+        }
+        left -= static_cast<int>(len);
+        lin = left == 0 ? linTarget_ : lin + linStep * static_cast<float>(len);
+        i += len;
     }
 
     e1_ = e1;
@@ -157,6 +181,9 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
     e4_ = e4;
     gSmooth_ = g;
     lastGainDb_ = g;
+    lin_ = lin;
+    linStep_ = linStep;
+    ctrlLeft_ = left;
 }
 
 float TransientShaper::getLastGainDb() const noexcept
