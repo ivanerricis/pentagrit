@@ -28,5 +28,12 @@ private:
     float aFast_ = 0, rE1_ = 0, aE2_ = 0, rE3_ = 0, rE4_ = 0, aGain_ = 0;
     // state
     float e1_ = 0, e2_ = 0, e3_ = 0, e4_ = 0, gSmooth_ = 0;
+
+    // Control-rate gain: the dB mapping, smoothing and dB->linear conversion run every ctrlInterval_ samples;
+    // the linear gain is ramped between those points.
+    int ctrlInterval_ = 8;
+    int ctrlLeft_ = 0;    // samples left until the next control tick (0: tick now)
+    float aGainCtrl_ = 0; // gain smoother coefficient for one control interval
+    float lin_ = 1.0f, linStep_ = 0.0f, linTarget_ = 1.0f;
 };
 } // namespace pentagrit
