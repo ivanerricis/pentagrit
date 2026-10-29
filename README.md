@@ -17,7 +17,17 @@ Formats: VST3 and CLAP on Windows, macOS and Linux; AU on macOS; plus a Standalo
 
 ## Install
 
-Copy the plugin bundles to the standard locations:
+### Windows (installer)
+
+Download `Pentagrit-vX.Y.Z-windows-setup.exe` from the [latest release](https://github.com/ivanerricis/pentagrit/releases/latest), run it (administrator rights required), and choose the components: VST3, CLAP and/or the Standalone app. The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC": click **More info**, then **Run anyway**. To uninstall, use **Settings, Apps, Installed apps, Pentagrit**.
+
+### macOS (installer)
+
+Download `Pentagrit-vX.Y.Z-macos.pkg` and open it. It is not signed or notarized yet, so Gatekeeper blocks a plain double-click: right-click the file and choose **Open**, or go to **System Settings, Privacy & Security, Open Anyway**. Pick the components (VST3, CLAP, Audio Unit, Standalone). To uninstall, delete `/Library/Audio/Plug-Ins/VST3/Pentagrit.vst3`, `/Library/Audio/Plug-Ins/CLAP/Pentagrit.clap`, `/Library/Audio/Plug-Ins/Components/Pentagrit.component` and `/Applications/Pentagrit.app`.
+
+### Manual install (zip / tar.gz, all platforms)
+
+Every release also contains a zip per platform (and a `.tar.gz` on Linux). Copy the plugin bundles to the standard locations:
 
 | Format | Windows | macOS | Linux |
 |---|---|---|---|
@@ -25,9 +35,11 @@ Copy the plugin bundles to the standard locations:
 | CLAP | `C:\Program Files\Common Files\CLAP` | `/Library/Audio/Plug-Ins/CLAP` or `~/Library/Audio/Plug-Ins/CLAP` | `~/.clap` |
 | AU | n/a | `/Library/Audio/Plug-Ins/Components` or `~/Library/Audio/Plug-Ins/Components` | n/a |
 
+Verify downloads with `SHA256SUMS.txt` from the same release (`sha256sum -c SHA256SUMS.txt`, or `shasum -a 256 -c` on macOS).
+
 ### macOS: Gatekeeper quarantine
 
-Builds are ad-hoc signed (not notarized yet, see `docs/MACOS_SIGNING.md`). Remove the quarantine flag after downloading:
+Builds are ad-hoc signed (not notarized yet, see `docs/MACOS_SIGNING.md`). If a plug-in installed from the zip does not load, remove the quarantine flag:
 
 ```
 xattr -dr com.apple.quarantine /path/to/Pentagrit.vst3

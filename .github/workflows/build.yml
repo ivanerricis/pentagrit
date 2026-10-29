@@ -12,6 +12,10 @@ on:
         description: 'Version used in the zip names (tag or X.Y.Z); defaults to the CMakeLists.txt version'
         type: string
         default: ''
+      installers:
+        description: 'Also build the Windows setup .exe and the macOS .pkg (release only, to keep PR CI cheap)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -166,11 +170,35 @@ jobs:
         shell: bash
         run: scripts/ci/package.sh "${{ matrix.package }}" "build/${{ matrix.preset }}" dist "${{ inputs.version }}"
 
+      - name: Build Windows installer (Inno Setup)
+        if: inputs.installers && matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.3 --no-progress -y
+          $zip = (Get-ChildItem dist -Filter 'Pentagrit-v*-windows-x64.zip').FullName
+          $ver = '${{ inputs.version }}'
+          if (-not $ver) { $ver = (Get-Item $zip).BaseName -replace '^Pentagrit-v(.*)-windows-x64$', '$1' }
+          scripts/ci/make_installer_windows.ps1 -Zip $zip -Version $ver -OutDir dist
+
+      - name: Build macOS installer (pkgbuild/productbuild)
+        if: inputs.installers && matrix.name == 'macos'
+        shell: bash
+        run: |
+          zip="$(ls dist/Pentagrit-v*-macos-universal.zip)"
+          ver="${{ inputs.version }}"
+          if [[ -z "$ver" ]]; then ver="$(basename "$zip" .zip | sed -E 's/^Pentagrit-v(.*)-macos-universal$/\1/')"; fi
+          scripts/ci/make_installer_macos.sh "$zip" "$ver" dist
+        # Signing is off by default; to enable, add env MACOS_INSTALLER_CERT (see docs/MACOS_SIGNING.md).
+
       - name: Upload package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pentagrit-${{ matrix.package }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.exe
+            dist/*.pkg
           retention-days: 7
           if-no-files-found: error
 

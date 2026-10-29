@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Collect the built plugin formats into Pentagrit-v<version>-<platform>.zip.
+# Collect the built plugin formats into Pentagrit-v<version>-<platform>.zip (+ .tar.gz on Linux).
+# Installers (scripts/ci/make_installer_*) are built from the resulting zip.
 # usage: package.sh <platform: windows-x64|macos-universal|linux-x64> <build_dir> <out_dir> [version]
 # version defaults to the one in CMakeLists.txt; a leading "v" is accepted.
 set -euo pipefail
@@ -100,5 +101,10 @@ Rescan plugins in your host after copying.
 TXT
 
 (cd "$out_dir/stage" && cmake -E tar cf "$out_dir/$name.zip" --format=zip -- "$name")
-rm -rf "$out_dir/stage"
 echo "created $out_dir/$name.zip"
+# Linux also gets a .tar.gz, which keeps the executable bits (the zip is kept as well).
+if [[ "$platform" == linux-* ]]; then
+    (cd "$out_dir/stage" && tar -czf "$out_dir/$name.tar.gz" -- "$name")
+    echo "created $out_dir/$name.tar.gz"
+fi
+rm -rf "$out_dir/stage"
