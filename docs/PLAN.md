@@ -1,5 +1,7 @@
 # Pentagrit — piano di implementazione
 
+> Stato (2026-10-29): WP0–WP8 uniti su main (scaffold, DSP, engine, preset, UI, CI, docs). In corso: WP9 (impostazioni + barra preset nell editor), WP10 (ottimizzazione CPU). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
+
 ## Context
 Plugin audio **Pentagrit**: transient shaper + saturatore/distorsore multibanda (JUCE 8, C++20, CMake), open source AGPL-3.0-or-later, repo GitHub privato `ivanerricis/pentagrit`.
 Formati: VST3 + CLAP (Windows/macOS/Linux), AU + universal binary (macOS). Dev machine: Windows 11, git/gh ok, CMake 4.5-rc2 e VS Build Tools 2026 (+2022) installati; Ninja/clang-format non installati.
@@ -36,7 +38,7 @@ Flusso: `input → Oversampler.up → inGain → crossover LR4 (cascata SVF TPT)
 - Realtime safe: niente allocazioni/lock, `ScopedNoDenormals`, parametri via `std::atomic<float>*`, meter atomici.
 
 ## Parametri (63, ID stabili — mai rinominare: CLAP li hasha)
-Globali: `inGain`, `outGain`, `mix`, `autoGain`, `oversampling`, `numBands`, `xover1..4` (20–20k log, default 120/1200/3500/8000), `bypass`, `osPhase` (Linear/Minimum, non automatable), `osRender` (Same as live/2x/4x/8x, non automatable). Per banda `b1_`..`b5_`: `gain`, `attack`, `sustain` (±24 dB), `speed`, `satType`, `drive` (0–36 dB), `mix`, `mute`, `solo`, `bypass`. Stato: APVTS XML `PENTAGRIT_STATE`, `stateVersion=1`, + dimensioni UI. Contratti C++ (ParamIDs/Parameters/DspTypes/Meters e API dei moduli DSP) congelati da WP0 e riportati nell'output dell'agente Opus (da copiare in `docs/ARCHITECTURE.md`).
+Globali: `inGain`, `outGain`, `mix`, `autoGain`, `oversampling`, `numBands`, `xover1..4` (20–20k log, default 120/500/2000/6000), `bypass`. Per banda `b1_`..`b5_`: `gain`, `attack`, `sustain` (±24 dB), `speed`, `satType`, `drive` (0–36 dB), `mix`, `mute`, `solo`, `bypass`. Stato: APVTS XML `PENTAGRIT_STATE`, `stateVersion=1`, + dimensioni UI. Contratti C++ (ParamIDs/Parameters/DspTypes/Meters e API dei moduli DSP) congelati da WP0 e riportati nell'output dell'agente Opus (da copiare in `docs/ARCHITECTURE.md`).
 
 ## Preset (WP8)
 - `PresetManager` (message thread, indipendente dall'audio thread): carica/salva via `apvts.copyState()/replaceState()`.
@@ -128,7 +130,7 @@ enum class OSFactor { x1, x2, x4, x8 };
 struct BandSettings { float gainDb=0, attackDb=0, sustainDb=0, speed01=.5f, driveDb=6, mix01=1;
                       SatType sat=SatType::off; bool mute=false, solo=false, bypass=false; };
 struct EngineSettings { float inGainDb=0, outGainDb=0, mix01=1; bool autoGain=false, bypass=false;
-  OSFactor os=OSFactor::x2; OSPhase osPhase=OSPhase::linear; OSFactor osRender=OSFactor::x1; bool osRenderSame=true; int numBands=3; std::array<float,4> xoverHz{120,1200,3500,8000};
+  OSFactor os=OSFactor::x2; int numBands=5; std::array<float,4> xoverHz{120,500,2000,6000};
   std::array<BandSettings,kMaxBands> bands{}; };
 // dsp/Meters.h  (audio thread scrive relaxed, UI legge)
 struct MeterState { std::array<std::atomic<float>,kMaxBands> bandPeakDb, bandTransientGainDb;
@@ -143,6 +145,22 @@ Convenzioni moduli DSP: `prepare()` può allocare (solo in prepareToPlay); `setP
 - `BandProcessor`: `setSettings(BandSettings, audible, lowFreqHintHz)`, `process`, `getTransientGainDb()`.
 - `MultibandEngine`: `prepare(sr, maxBlock, numCh)`, `setSettings(EngineSettings)`, `process(AudioBuffer<float>&)` (chunking interno), `getLatencySamples()`, `static effectiveFactor(OSFactor, sr)`, `static computeAudibility(settings)`, `meters()`.
 - `PentagritAudioProcessor`: `getAPVTS()`, `getMeters()`, `getPresetManager()`.
+
+## Decisioni dell'utente sul mockup (aggiornamento)
+- Logo a pentagono approvato; wordmark da convertire in tracciati.
+- **numBands default = 3**; xover default 120 / 1200 / 3500 / 8000 Hz. Le strip inutilizzate si **comprimono** (le altre si allargano), il display crossover mostra solo le bande attive.
+- Finestra a rapporto fisso 1100×680; **zoom scelto dall'utente** da un popup impostazioni (75/100/125/150/200%), salvato in `juce::PropertiesFile` (non è un parametro né fa parte dei preset).
+- Footer con **lettura CPU** (`MeterState::cpuLoad`, 0..1). Nessuna scala dB sui meter di banda.
+- Menu preset a **sottomenu annidati** (Factory/User ▸ categoria ▸ preset), categorie utente = sottocartelle; i preset di fabbrica impostano `numBands` esplicitamente.
+
+## Impostazioni (WP9) — scelte dell'utente
+Pannello Settings (ingranaggio) con 4 schede.
+- **Interface** (per utente, `juce::PropertiesFile` `Pentagrit/settings.settings`): zoom 75–200%, tema scuro/chiaro, **layout** Full / Compact (senza display crossover, frequenze come campi numerici), tooltip on/off, doppio clic (reset | inserisci valore), manopola (verticale | circolare + sensibilità), meter (peak hold, release, refresh 30/60 Hz), mostra CPU.
+- **Audio** (salvate col progetto/stato, parametri NON automatabili): `osPhase` {Linear, Minimum} default Linear; `osRender` {Same as live, 2x, 4x, 8x} usato quando `isNonRealtime()` (bounce/render offline). Totale parametri = **63**. Minimum phase = `filterHalfBandPolyphaseIIR`, latenza arrotondata a intero (leggero mismatch col dry/bypass, documentato).
+- **Presets** (per utente): cartella preset utente (modificabile + "Apri cartella"), preset di avvio (ultimo usato | Init | specifico).
+- **About & Support**: versione, licenza, link repo, "Copia info di debug", **controllo aggiornamenti opt-in (default OFF)** via GitHub Releases + "Controlla ora", "Reset impostazioni" (solo impostazioni utente).
+- Nota update-check: finché il repo è privato l'API GitHub non è raggiungibile senza token → la funzione resta nascosta/disabilitata (feature flag) fino a quando il repo o le release saranno pubblici.
+- WP9 `feat/settings`: `src/settings/SettingsManager.*`, `ui/SettingsPanel.*`, SettingsTests; dipende da WP0 (+WP5b per l'integrazione UI). L'engine (WP4) implementa `osPhase`, `osRender`, layout Compact lo gestisce WP5b.
 
 ## Dove vive il piano (continuità tra sessioni)
 - Copia locale: `C:\Users\Utente\.claude\plans\ancient-wobbling-parnas.md` (solo su questa macchina).

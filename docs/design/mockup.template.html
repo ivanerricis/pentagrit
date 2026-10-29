@@ -1,0 +1,215 @@
+<title>Pentagrit UI Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one 1100x680 plugin window scaled to fit; top bar, crossover display, 5 band strips + global panel, footer. Below it, brand sheet. */
+:root{
+  --bg0:#0E1013; --bg1:#151920; --bg2:#1D222B; --bg3:#2A313D; --bg4:#394252;
+  --ink:#E8ECF2; --ink2:#98A2B3; --ink3:#5F6A7C;
+  --b1:#FF5A5F; --b2:#FFB347; --b3:#F9F871; --b4:#4CD7A6; --b5:#4DA3FF;
+  --mute:#FF5A5F; --solo:#F9F871; --byp:#4DA3FF;
+  --sans:"IBM Plex Sans","Segoe UI",system-ui,Arial,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#07080A;color:var(--ink);font-family:var(--sans);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.page{display:flex;flex-direction:column;gap:28px}
+.page>.intro,.page>section{max-width:1100px;width:100%}
+.intro{color:var(--ink2);font-size:14px;line-height:1.5;max-width:70ch;margin:0}
+.intro b{color:var(--ink);font-weight:500}
+#stage{width:100%;position:relative;overflow-x:auto}
+#sizer{position:relative}
+#plug{color:var(--ink);width:1100px;height:680px;transform-origin:0 0;background:var(--bg0);position:absolute;left:0;top:0;
+  display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:52px 168px minmax(0,1fr) 26px;gap:0;overflow:hidden;user-select:none;-webkit-user-select:none;font-size:12px}
+#plug.bypassed .body{opacity:.4}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.lbl{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.val{font-family:var(--mono);font-size:10.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+/* top bar */
+.top{background:var(--bg1);display:flex;align-items:center;gap:8px;white-space:nowrap;padding:0 10px;position:relative}
+.brand{display:flex;align-items:center;gap:8px;width:126px;flex:none}
+.brand svg.ic{width:30px;height:30px}
+.brand .wm{font-weight:600;letter-spacing:.14em;font-size:13px}
+.preset{display:flex;align-items:center;gap:3px;flex:none}
+.pbtn{height:30px;min-width:28px;background:var(--bg2);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--ink2);padding:0 8px}
+.pbtn:hover{background:var(--bg3);color:var(--ink)}
+.pname{width:150px;justify-content:space-between;color:var(--ink);font-weight:500;font-size:12.5px}
+.pname .mod{color:var(--b2);margin-left:2px}
+.ab{display:flex;gap:2px;margin-left:6px}
+.ab button{width:26px;height:30px;background:var(--bg2);color:var(--ink2);font-weight:600;border-radius:4px}
+.ab button.on{background:var(--ink);color:var(--bg0)}
+.grp{display:flex;align-items:center;gap:6px;flex:none}
+.seg{display:flex;background:var(--bg2);border-radius:4px;padding:2px;gap:2px}
+.seg button{height:26px;min-width:27px;padding:0 6px;border-radius:3px;color:var(--ink2);font-size:11.5px;font-weight:500}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--ink);color:var(--bg0)}
+.lat{display:flex;flex-direction:column;align-items:flex-end;min-width:58px}
+.tog{height:30px;padding:0 10px;background:var(--bg2);border-radius:4px;color:var(--ink2);font-weight:600;font-size:11px;letter-spacing:.06em}
+.tog:hover{background:var(--bg3);color:var(--ink)}
+.tog.on{background:var(--ink);color:var(--bg0)}
+.tog.byp.on{background:var(--b1);color:var(--bg0)}
+.spacer{flex:1}
+/* menus */
+.menu{position:absolute;z-index:50;background:var(--bg3);border-radius:6px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:200px;max-height:560px;overflow:auto}
+.menu[hidden]{display:none}
+.menu h4{margin:8px 8px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500}
+.menu h5{margin:6px 8px 2px;font-size:11px;color:var(--ink2);font-weight:500}
+.menu button{display:flex;width:100%;text-align:left;padding:6px 8px;border-radius:4px;color:var(--ink);font-size:12px;gap:6px;align-items:center}
+.menu button:hover,.menu button.open{background:var(--bg4)}
+.menu button.cur{color:var(--b4)}
+.menu button[disabled]{color:var(--ink3);cursor:default;background:none}
+.menu .ck{width:12px;flex:none;font-size:11px}
+.menu .lb{flex:1;white-space:nowrap}
+.menu .rt{color:var(--ink3);font-family:var(--mono);font-size:10px;padding-left:14px}
+.menu{min-width:150px}
+.fld{display:flex;flex-direction:column;gap:4px}
+.menu hr{border:0;height:6px;margin:0}
+.menu kbd{font-family:var(--mono);font-size:10px;color:var(--ink3)}
+/* crossover */
+.xo{background:var(--bg1);margin:8px 8px 0;border-radius:6px;position:relative}
+.xo canvas{width:100%;height:100%;display:block;touch-action:none}
+/* body */
+.body{display:flex;gap:6px;padding:8px;min-height:0}
+.strip{flex:1 1 0;min-width:168px;background:var(--bg1);border-radius:6px;display:flex;flex-direction:column;padding:8px 8px 6px;gap:6px;position:relative;transition:opacity .15s}
+.strip.dim .inner{opacity:.45}
+.strip .cbar{position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 2px 2px 0;background:var(--c)}
+.sh{display:flex;align-items:center;gap:6px;height:28px}
+.sh .nm{font-weight:600;font-size:12.5px;color:var(--c)}
+.sh .fr{font-family:var(--mono);font-size:9.5px;color:var(--ink3);line-height:1.15;flex:1;text-align:left}
+.msb{display:flex;gap:2px}
+.msb button{width:20px;height:20px;background:var(--bg2);border-radius:3px;font-size:10px;font-weight:600;color:var(--ink3)}
+.msb button:hover{color:var(--ink);background:var(--bg3)}
+.msb button.m.on{background:var(--mute);color:var(--bg0)}
+.msb button.s.on{background:var(--solo);color:var(--bg0)}
+.msb button.b.on{background:var(--byp);color:var(--bg0)}
+.inner{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;transition:opacity .15s}
+.sec{background:var(--bg0);border-radius:4px;padding:6px 6px 5px;display:flex;flex-direction:column;gap:4px}
+.sec.grow{flex:1}
+.krow{display:flex;justify-content:space-between;gap:2px}
+.knob{display:flex;flex-direction:column;align-items:center;gap:1px;width:50px;cursor:ns-resize;touch-action:none}
+.knob svg{display:block}
+.tg{height:14px;background:var(--bg2);border-radius:2px;position:relative;overflow:hidden}
+.tg i{position:absolute;top:0;bottom:0;background:var(--c)}
+.tg b{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--bg4)}
+.tg span{position:absolute;right:4px;top:0;line-height:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink)}
+.satsel{display:flex;align-items:center;gap:2px}
+.satsel button{width:22px;height:22px;background:var(--bg2);border-radius:3px;color:var(--ink2)}
+.satsel button:hover{color:var(--ink);background:var(--bg3)}
+.satsel .t{flex:1;height:22px;background:var(--bg2);border-radius:3px;text-align:center;line-height:22px;font-weight:500;font-size:11.5px}
+.curve path{vector-effect:non-scaling-stroke}
+.gear{width:30px;padding:0;display:flex;align-items:center;justify-content:center}
+.curve{display:block;background:var(--bg2);border-radius:3px;width:100%;height:44px}
+.outrow{display:flex;align-items:flex-end;justify-content:space-between}
+.meter{display:flex;gap:3px;height:54px}
+.meter div{width:8px;background:var(--bg2);border-radius:2px;position:relative;overflow:hidden}
+.meter i{position:absolute;left:0;right:0;bottom:0;background:var(--c);height:0}
+.meter.g div{width:12px}
+.meter.big{height:140px}
+.glob{width:190px;flex:none;background:var(--bg1);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:8px}
+.glob h3{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500;height:28px;display:flex;align-items:center}
+.glob .row{display:flex;justify-content:space-around}
+.mrow{display:flex;justify-content:space-between;align-items:flex-end}
+.mrow .mc{display:flex;flex-direction:column;align-items:center;gap:4px}
+.ag{display:flex;justify-content:space-between;align-items:center;background:var(--bg0);border-radius:4px;padding:6px 8px}
+.ag .val{color:var(--ink)}
+/* footer */
+.foot{background:var(--bg1);display:flex;align-items:center;padding:0 12px;gap:16px;color:var(--ink3);font-size:11px}
+.foot .hint{min-width:0;flex:1;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot .val{color:var(--ink3)}
+/* modal */
+.modal{position:absolute;inset:0;background:rgba(7,8,10,.7);z-index:70;display:flex;align-items:center;justify-content:center}
+.modal[hidden]{display:none}
+.modal .card{background:var(--bg3);border-radius:8px;padding:16px;width:320px;display:flex;flex-direction:column;gap:12px}
+.modal h3{margin:0;font-size:14px;font-weight:600}
+.modal input{background:var(--bg0);border:0;border-radius:4px;color:var(--ink);font:inherit;font-size:13px;padding:8px 10px}
+.modal .btns{display:flex;gap:6px;justify-content:flex-end}
+.modal .btns button{padding:7px 14px;border-radius:4px;background:var(--bg2);font-weight:500}
+.modal .btns .ok{background:var(--ink);color:var(--bg0)}
+/* brand sheet */
+.brand-sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.tile{border-radius:8px;padding:24px;display:flex;align-items:center;justify-content:center;min-height:150px;min-width:0}
+.tile svg{max-width:100%;height:auto}
+.tile.dark{background:var(--bg1)} .tile.light{background:#E8ECF2} .tile.vio{background:var(--bg0)}
+.tile .w{width:100%;max-width:340px}
+.tile.sm svg{width:96px;height:96px}
+.sw{display:flex;flex-wrap:wrap;gap:8px}
+.sw div{width:84px;border-radius:6px;overflow:hidden;background:var(--bg1);font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+.sw i{display:block;height:36px}
+.sw span{display:block;padding:4px 6px}
+h2{font-size:15px;font-weight:600;margin:0 0 10px}
+.mini{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.mini svg{width:16px;height:16px}.mini .s32{width:32px;height:32px}
+
+#plug[data-theme="light"]{--bg0:#E6EAF0;--bg1:#F6F8FA;--bg2:#E4E9EF;--bg3:#CDD5DF;--bg4:#B6C1CE;--ink:#14181F;--ink2:#4A5566;--ink3:#76808F;--b1:#E5484D;--b2:#E58A00;--b3:#B8A400;--b4:#14A478;--b5:#1F7FE0}
+#plug.compact{grid-template-rows:52px minmax(0,1fr) 26px}
+#plug.compact .xo{display:none}
+#plug.compact .sh .fr{display:none}
+.xrow{display:none}
+#plug.compact .xrow{display:flex;gap:6px;justify-content:space-between}
+.xrow label{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.xrow input{width:68px;background:var(--bg2);color:var(--ink);border:0;border-radius:3px;padding:4px 5px;font-family:var(--mono);font-size:10.5px;text-align:right}
+.xrow input:disabled{color:var(--ink3);background:var(--bg0)}
+.meter u{position:absolute;left:0;right:0;height:2px;background:var(--ink);bottom:0}
+#plug.nohold .meter u{display:none}
+.vin{width:48px;font:inherit;text-align:center;background:var(--bg3);color:var(--ink);border:0;border-radius:2px;padding:0}
+.tip{position:absolute;z-index:60;background:var(--ink);color:var(--bg0);font-size:11px;line-height:1.35;padding:5px 8px;border-radius:4px;max-width:260px;pointer-events:none}
+.tip[hidden]{display:none}
+.settings{position:absolute;inset:0;background:rgba(7,8,10,.62);z-index:30;display:flex;align-items:center;justify-content:center}
+.settings[hidden]{display:none}
+.scard{width:780px;height:calc(100% - 28px);background:var(--bg1);border-radius:8px;display:flex;flex-direction:column;min-height:0;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.shead{display:flex;align-items:center;gap:12px;padding:12px 16px}
+.shead h3{margin:0;font-size:15px;font-weight:600;flex:1}
+.sbody{flex:1;min-height:0;overflow-y:auto;padding:0 16px 8px}
+.smsg{min-height:30px;padding:6px 16px;color:var(--ink2);font-size:11px;display:flex;align-items:center}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:24px;background:var(--bg2);border-radius:4px;padding:8px 12px;margin-bottom:4px}
+.sl{flex:1;min-width:0}
+.st{display:block;font-size:12.5px;color:var(--ink);font-weight:500}
+.sd{display:block;font-size:11px;color:var(--ink2);margin-top:2px;line-height:1.35}
+.sc{display:flex;align-items:center;gap:8px;flex:none}
+.shd{margin:14px 0 6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500}
+.snote{margin:4px 0 10px;font-size:12px;color:var(--ink2)}
+.badge{font-style:normal;font-size:9.5px;font-weight:500;background:var(--bg4);color:var(--ink);padding:1px 7px;border-radius:8px;margin-left:8px;letter-spacing:.02em}
+.settings .tog,.settings .seg{background:var(--bg3)}
+.settings .seg button.on,.settings .tog.on{background:var(--ink);color:var(--bg0)}
+.settings .stabs{background:var(--bg2)}
+.settings .tog{height:28px}
+.settings input[type=text],.settings textarea{background:var(--bg0);color:var(--ink);border:0;border-radius:4px;padding:6px 8px;font-family:var(--mono);font-size:11px}
+.settings textarea{width:100%;resize:none;display:block;margin-top:6px;line-height:1.5}
+.sw{width:38px;height:22px;border-radius:11px;background:var(--bg4);position:relative;padding:0}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:8px;background:var(--bg1)}
+.sw.on{background:var(--ink)}
+.sw.on::after{left:19px;background:var(--bg0)}
+.rng{display:flex;align-items:center;gap:8px}
+.rng input{width:170px;accent-color:var(--ink)}
+.lat2{font-family:var(--mono);font-size:11px;color:var(--ink);line-height:1.6;text-align:right}
+.settings a{color:var(--b5)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="page">
+  <p class="intro"><b>Pentagrit</b> mockup, window 1100 x 680. Drag knobs vertically (Shift = fine, double-click = reset, wheel works), drag the crossover handles, switch the number of bands, change the saturation type, mute / solo / bypass a band, open the preset browser and the menu. Meters are fake and animated.</p>
+  <div id="stage"><div id="sizer"><div id="plug" aria-label="Pentagrit plugin window"></div></div></div>
+
+  <section>
+    <h2>Brand</h2>
+    <div class="brand-sheet">
+      <div class="tile dark"><div class="w">%%LOGO%%</div></div>
+      <div class="tile light"><div class="w">%%LOGOMONO%%</div></div>
+      <div class="tile vio sm">%%ICON%%</div>
+    </div>
+    <div class="mini" style="margin-top:12px"><span class="val">16 / 32 px:</span><span id="i16"></span><span id="i32"></span></div>
+  </section>
+  <section>
+    <h2>Palette</h2>
+    <div class="sw" id="sw"></div>
+  </section>
+</div>
+
+<template id="markT">%%MARK%%</template><template id="iconT">%%ICON%%</template>
+<script>
+%%JS%%
+</script>
