@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Wavefold Shimmer" category="Creative" author="Pentagrit" description="Metallic folded highs">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="5"/>
+    <PARAM id="xover1" value="150"/>
+    <PARAM id="xover2" value="600"/>
+    <PARAM id="xover3" value="2500"/>
+    <PARAM id="xover4" value="6000"/>
+    <PARAM id="b4_satType" value="4"/>
+    <PARAM id="b4_drive" value="18"/>
+    <PARAM id="b4_mix" value="0.4"/>
+    <PARAM id="b5_satType" value="4"/>
+    <PARAM id="b5_drive" value="18"/>
+    <PARAM id="b5_mix" value="0.4"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>
