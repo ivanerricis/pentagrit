@@ -10,7 +10,7 @@ namespace pentagrit
 {
 namespace
 {
-constexpr float kFloor = 1.0e-9f;       // follower floor (-180 dBFS), keeps everything normal
+constexpr float kFloor = 1.0e-9f;        // follower floor (-180 dBFS), keeps everything normal
 constexpr float kDbPerLog2 = 6.0205999f; // 20*log10(2)
 constexpr float kAttackDeadbandDb = 2.0f;
 constexpr float kGateLin = 3.1622777e-4f; // -70 dBFS
@@ -28,7 +28,10 @@ inline float fastLog2(float x) noexcept
     return e + p;
 }
 
-inline float toDb(float x) noexcept { return kDbPerLog2 * fastLog2(std::max(x, kFloor)); }
+inline float toDb(float x) noexcept
+{
+    return kDbPerLog2 * fastLog2(std::max(x, kFloor));
+}
 } // namespace
 
 void TransientShaper::prepare(double procRate, int, int)
@@ -103,7 +106,8 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
     const float aF = aFast_, aS = aE2_, r1 = rE1_, r3 = rE3_, r4 = rE4_, ag = aGain_;
     const float atk = attackDb_, sus = sustainDb_;
 
-    auto follow = [](float e, float x, float a, float r) noexcept {
+    auto follow = [](float e, float x, float a, float r) noexcept
+    {
         const float c = x > e ? a : r;
         return c * e + (1.0f - c) * x;
     };
@@ -155,5 +159,8 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
     lastGainDb_ = g;
 }
 
-float TransientShaper::getLastGainDb() const noexcept { return lastGainDb_; }
+float TransientShaper::getLastGainDb() const noexcept
+{
+    return lastGainDb_;
+}
 } // namespace pentagrit

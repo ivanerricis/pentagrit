@@ -17,13 +17,15 @@ PentagritAudioProcessor::PentagritAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts_(*this, nullptr, juce::Identifier(kStateTag), createParameterLayout()),
-      params_(apvts_),
+      apvts_(*this, nullptr, juce::Identifier(kStateTag), createParameterLayout()), params_(apvts_),
       presetManager_(apvts_)
 {
 }
 
-const juce::String PentagritAudioProcessor::getName() const { return info::kName; }
+const juce::String PentagritAudioProcessor::getName() const
+{
+    return info::kName;
+}
 
 void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
@@ -60,7 +62,8 @@ void PentagritAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     // Smoothed fraction of the block time spent here (cheap, realtime safe).
     if (currentSampleRate_ > 0.0 && buffer.getNumSamples() > 0)
     {
-        const double elapsed = juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - startTicks);
+        const double elapsed =
+            juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - startTicks);
         const double budget = buffer.getNumSamples() / currentSampleRate_;
         auto& load = engine_.meters().cpuLoad;
         const float prev = load.load(std::memory_order_relaxed);
