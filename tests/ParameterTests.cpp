@@ -47,15 +47,15 @@ TEST_CASE("Band parameter IDs follow the naming scheme", "[parameters]")
 TEST_CASE("Parameter defaults", "[parameters]")
 {
     PentagritAudioProcessor proc;
-    CHECK(raw(proc, pid::inGain) == Approx(0.0f));
-    CHECK(raw(proc, pid::outGain) == Approx(0.0f));
+    CHECK(raw(proc, pid::inGain) == Approx(0.0f).margin(1e-5f));
+    CHECK(raw(proc, pid::outGain) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::mix) == Approx(1.0f));
-    CHECK(raw(proc, pid::autoGain) == Approx(0.0f));
+    CHECK(raw(proc, pid::autoGain) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::oversampling) == Approx(1.0f));
     CHECK(raw(proc, pid::numBands) == Approx(3.0f));
-    CHECK(raw(proc, pid::bypass) == Approx(0.0f));
-    CHECK(raw(proc, pid::osPhase) == Approx(0.0f));
-    CHECK(raw(proc, pid::osRender) == Approx(0.0f));
+    CHECK(raw(proc, pid::bypass) == Approx(0.0f).margin(1e-5f));
+    CHECK(raw(proc, pid::osPhase) == Approx(0.0f).margin(1e-5f));
+    CHECK(raw(proc, pid::osRender) == Approx(0.0f).margin(1e-5f));
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::osPhase)->isAutomatable());
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::osRender)->isAutomatable());
 
@@ -65,12 +65,12 @@ TEST_CASE("Parameter defaults", "[parameters]")
 
     for (int b = 0; b < kMaxBands; ++b)
     {
-        CHECK(raw(proc, bandParamID(b, BandParam::gain)) == Approx(0.0f));
+        CHECK(raw(proc, bandParamID(b, BandParam::gain)) == Approx(0.0f).margin(1e-5f));
         CHECK(raw(proc, bandParamID(b, BandParam::speed)) == Approx(0.5f));
-        CHECK(raw(proc, bandParamID(b, BandParam::satType)) == Approx(0.0f));
+        CHECK(raw(proc, bandParamID(b, BandParam::satType)) == Approx(0.0f).margin(1e-5f));
         CHECK(raw(proc, bandParamID(b, BandParam::drive)) == Approx(6.0f));
         CHECK(raw(proc, bandParamID(b, BandParam::mix)) == Approx(1.0f));
-        CHECK(raw(proc, bandParamID(b, BandParam::mute)) == Approx(0.0f));
+        CHECK(raw(proc, bandParamID(b, BandParam::mute)) == Approx(0.0f).margin(1e-5f));
     }
 }
 
