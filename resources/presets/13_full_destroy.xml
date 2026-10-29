@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Full Destroy" category="Creative" author="Pentagrit" description="Everything clipped and folded">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="5"/>
+    <PARAM id="xover1" value="120"/>
+    <PARAM id="xover2" value="500"/>
+    <PARAM id="xover3" value="2000"/>
+    <PARAM id="xover4" value="6000"/>
+    <PARAM id="oversampling" value="3"/>
+    <PARAM id="autoGain" value="1"/>
+    <PARAM id="outGain" value="-6"/>
+    <PARAM id="b1_satType" value="5"/>
+    <PARAM id="b1_drive" value="24"/>
+    <PARAM id="b2_satType" value="4"/>
+    <PARAM id="b2_drive" value="28"/>
+    <PARAM id="b3_satType" value="5"/>
+    <PARAM id="b3_drive" value="30"/>
+    <PARAM id="b4_satType" value="4"/>
+    <PARAM id="b4_drive" value="26"/>
+    <PARAM id="b5_satType" value="5"/>
+    <PARAM id="b5_drive" value="28"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>

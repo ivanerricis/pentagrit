@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Init" category="Init" author="Pentagrit" description="Neutral starting point">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="3"/>
+    <PARAM id="oversampling" value="1"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>

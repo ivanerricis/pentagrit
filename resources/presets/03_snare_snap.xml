@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Sparse preset: parameters not listed take their default value. -->
+<PENTAGRIT_PRESET stateVersion="1" name="Snare Snap" category="Drums" author="Pentagrit" description="Crack and snap, tighter lows">
+  <PENTAGRIT_STATE>
+    <PARAM id="numBands" value="4"/>
+    <PARAM id="xover1" value="150"/>
+    <PARAM id="xover2" value="600"/>
+    <PARAM id="xover3" value="3000"/>
+    <PARAM id="b1_sustain" value="-4"/>
+    <PARAM id="b2_sustain" value="-4"/>
+    <PARAM id="b3_attack" value="9"/>
+    <PARAM id="b4_attack" value="6"/>
+  </PENTAGRIT_STATE>
+</PENTAGRIT_PRESET>
