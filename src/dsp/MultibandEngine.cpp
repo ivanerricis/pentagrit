@@ -11,9 +11,15 @@ void MultibandEngine::prepare(double, int, int)
 }
 
 void MultibandEngine::reset() noexcept {}
-void MultibandEngine::setSettings(const EngineSettings& settings) noexcept { settings_ = settings; }
+void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
+{
+    settings_ = settings;
+}
 void MultibandEngine::process(juce::AudioBuffer<float>&) noexcept {}
-int MultibandEngine::getLatencySamples() const noexcept { return latency_; }
+int MultibandEngine::getLatencySamples() const noexcept
+{
+    return latency_;
+}
 
 int MultibandEngine::effectiveFactor(OSFactor requested, double sampleRate) noexcept
 {

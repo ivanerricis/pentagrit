@@ -8,7 +8,10 @@ namespace pentagrit
 {
 inline constexpr float kSilenceDb = -100.0f;
 
-inline float dbToGain(float db) noexcept { return std::pow(10.0f, db * 0.05f); }
+inline float dbToGain(float db) noexcept
+{
+    return std::pow(10.0f, db * 0.05f);
+}
 
 inline float gainToDb(float gain) noexcept
 {
@@ -23,8 +26,7 @@ inline float timeToCoeff(double seconds, double sampleRate) noexcept
     return static_cast<float>(std::exp(-1.0 / (seconds * sampleRate)));
 }
 
-template <typename T>
-constexpr T clampTo(T v, T lo, T hi) noexcept
+template <typename T> constexpr T clampTo(T v, T lo, T hi) noexcept
 {
     return std::min(std::max(v, lo), hi);
 }

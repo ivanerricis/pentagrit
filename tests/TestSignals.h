@@ -26,7 +26,8 @@ inline Signal sine(size_t n, double freqHz, double sampleRate, float amplitude =
 {
     Signal s(n);
     for (size_t i = 0; i < n; ++i)
-        s[i] = amplitude * static_cast<float>(std::sin(2.0 * kPi * freqHz * static_cast<double>(i) / sampleRate + phase));
+        s[i] = amplitude *
+               static_cast<float>(std::sin(2.0 * kPi * freqHz * static_cast<double>(i) / sampleRate + phase));
     return s;
 }
 
@@ -41,11 +42,13 @@ inline Signal noise(size_t n, unsigned seed = 1234, float amplitude = 1.0f)
 }
 
 // Silence, then `length` samples of a sine starting at `start`, then silence (Hann-free hard burst).
-inline Signal burst(size_t n, size_t start, size_t length, double freqHz, double sampleRate, float amplitude = 1.0f)
+inline Signal burst(size_t n, size_t start, size_t length, double freqHz, double sampleRate,
+                    float amplitude = 1.0f)
 {
     Signal s(n, 0.0f);
     for (size_t i = start; i < start + length && i < n; ++i)
-        s[i] = amplitude * static_cast<float>(std::sin(2.0 * kPi * freqHz * static_cast<double>(i - start) / sampleRate));
+        s[i] = amplitude *
+               static_cast<float>(std::sin(2.0 * kPi * freqHz * static_cast<double>(i - start) / sampleRate));
     return s;
 }
 
@@ -103,6 +106,12 @@ inline double rms(const Signal& s, size_t from = 0, size_t to = static_cast<size
     return std::sqrt(acc / static_cast<double>(to - from));
 }
 
-inline double toDb(double linear) { return 20.0 * std::log10(std::max(linear, 1.0e-12)); }
-inline double fromDb(double db) { return std::pow(10.0, db / 20.0); }
+inline double toDb(double linear)
+{
+    return 20.0 * std::log10(std::max(linear, 1.0e-12));
+}
+inline double fromDb(double db)
+{
+    return std::pow(10.0, db / 20.0);
+}
 } // namespace pentagrit::test

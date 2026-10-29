@@ -15,7 +15,8 @@ public:
 
     void setEnabled(bool enabled) noexcept;
     // Measures `ref` (dry) against `wet` and applies the compensation gain to `wet` in place.
-    void process(const juce::dsp::AudioBlock<const float>& ref, const juce::dsp::AudioBlock<float>& wet) noexcept;
+    void process(const juce::dsp::AudioBlock<const float>& ref,
+                 const juce::dsp::AudioBlock<float>& wet) noexcept;
     float getCurrentGainDb() const noexcept;
 
 private:

@@ -54,7 +54,10 @@ SplitResult splitSignal(double rate, int numBands, const std::array<float, 4>& h
     return r;
 }
 
-double binOf(double hz, double rate, size_t n) { return hz * static_cast<double>(n) / rate; }
+double binOf(double hz, double rate, size_t n)
+{
+    return hz * static_cast<double>(n) / rate;
+}
 
 double magDbAt(const std::vector<float>& mag, double hz, double rate, size_t n)
 {
@@ -172,7 +175,8 @@ TEST_CASE("Crossover bands roll off at least 22 dB/oct away from the crossover",
         mags[b] = fftMagnitude(r.bands[b]);
 
     // Slope between 1 and 2 octaves away from the band edge, outside the band.
-    auto slope = [&](size_t band, double edge, double dir) {
+    auto slope = [&](size_t band, double edge, double dir)
+    {
         const double near1 = magDbAt(mags[band], edge * std::pow(2.0, dir * 1.0), sr, n);
         const double far2 = magDbAt(mags[band], edge * std::pow(2.0, dir * 2.0), sr, n);
         return far2 - near1; // dB per octave (negative)
@@ -201,7 +205,8 @@ TEST_CASE("Crossover enforceOrdering", "[Crossover]")
     const double ratio = std::cbrt(2.0);
     const double eps = 1.0e-4;
 
-    auto checkSpacing = [&](const std::array<float, 4>& f, int bands, double baseRate) {
+    auto checkSpacing = [&](const std::array<float, 4>& f, int bands, double baseRate)
+    {
         const double fmax = std::min(20000.0, 0.45 * baseRate);
         const int active = bands - 1;
         for (int i = 0; i < active; ++i)
@@ -282,7 +287,8 @@ TEST_CASE("Crossover stays finite on silence, denormals and frequency sweeps", "
         blocks[b] = juce::dsp::AudioBlock<float>(ptrs[b].data(), 2, block);
     }
 
-    auto processBlock = [&](const Signal& s) {
+    auto processBlock = [&](const Signal& s)
+    {
         const std::array<const float*, 2> in{s.data(), s.data()};
         xo.split(juce::dsp::AudioBlock<const float>(in.data(), 2, block), blocks);
         for (auto& band : out)
@@ -323,8 +329,8 @@ TEST_CASE("Crossover stays finite on silence, denormals and frequency sweeps", "
         for (int i = 0; i < 200; ++i)
         {
             if (i % 20 == 0)
-                xo.setFrequencies({20.0f + static_cast<float>(i) * 30.0f, 1000.0f, 9000.0f - static_cast<float>(i) * 20.0f,
-                                   19000.0f});
+                xo.setFrequencies({20.0f + static_cast<float>(i) * 30.0f, 1000.0f,
+                                   9000.0f - static_cast<float>(i) * 20.0f, 19000.0f});
             if (i % 50 == 0)
                 xo.setNumBands(2 + (i / 50) % 4);
             REQUIRE(processBlock(in));

@@ -24,7 +24,8 @@ public:
     std::array<float, 4> getEffectiveFrequencies() const noexcept;
 
     // Enforces ascending order with a minimum distance of 1/3 octave (parameter values are not rewritten).
-    static std::array<float, 4> enforceOrdering(std::array<float, 4> hz, int numBands, double baseRate) noexcept;
+    static std::array<float, 4> enforceOrdering(std::array<float, 4> hz, int numBands,
+                                                double baseRate) noexcept;
 
     // Splits `in` into the first numBands blocks of `bands` (same size as `in`).
     void split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& bands) noexcept;
@@ -43,8 +44,8 @@ private:
         double a1 = 0.0, a2 = 0.0, a3 = 0.0;
     };
 
-    // Log-domain frequency smoother, advanced every kCoefInterval samples. One instance drives split(), another
-    // one the dry allpass chain, so both follow the same trajectory when fed the same block sizes.
+    // Log-domain frequency smoother, advanced every kCoefInterval samples. One instance drives split(),
+    // another one the dry allpass chain, so both follow the same trajectory when fed the same block sizes.
     struct Smoother
     {
         std::array<double, 4> logHz{};
@@ -64,8 +65,7 @@ private:
     void updateTargets() noexcept;
     void snap(Smoother& s) const noexcept;
     void advance(Smoother& s) const noexcept;
-    template <typename Fn>
-    void forEachChunk(Smoother& s, int numSamples, Fn&& fn) noexcept;
+    template <typename Fn> void forEachChunk(Smoother& s, int numSamples, Fn&& fn) noexcept;
 
     double baseRate_ = 44100.0, procRate_ = 44100.0;
     int numBands_ = kMaxBands;

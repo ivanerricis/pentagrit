@@ -18,12 +18,13 @@ struct ParamRefs
 {
     explicit ParamRefs(juce::AudioProcessorValueTreeState& apvts);
 
-    std::atomic<float> *inGain, *outGain, *mix, *autoGain, *oversampling, *numBands, *bypass, *osPhase, *osRender;
+    std::atomic<float>*inGain, *outGain, *mix, *autoGain, *oversampling, *numBands, *bypass, *osPhase,
+        *osRender;
     std::array<std::atomic<float>*, 4> xover;
 
     struct Band
     {
-        std::atomic<float> *gain, *attack, *sustain, *speed, *satType, *drive, *mix, *mute, *solo, *bypass;
+        std::atomic<float>*gain, *attack, *sustain, *speed, *satType, *drive, *mix, *mute, *solo, *bypass;
     };
     std::array<Band, kMaxBands> bands;
 
