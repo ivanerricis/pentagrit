@@ -26,6 +26,17 @@ configure_file(PluginInfo.h.in "${CMAKE_BINARY_DIR}/generated/PluginInfo.h" @ONL
 file(GLOB_RECURSE PENTAGRIT_CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 list(FILTER PENTAGRIT_CORE_SOURCES EXCLUDE REGEX "PluginEntry\\.cpp$")
 
+# Embedded UI fonts (IBM Plex, SIL OFL 1.1).
+juce_add_binary_data(PentagritUiAssets
+  HEADER_NAME PentagritUiData.h
+  NAMESPACE PentagritUiData
+  SOURCES
+    resources/ui/fonts/IBMPlexSans-Regular.ttf
+    resources/ui/fonts/IBMPlexSans-Medium.ttf
+    resources/ui/fonts/IBMPlexSans-SemiBold.ttf
+    resources/ui/fonts/IBMPlexMono-Regular.ttf
+    resources/ui/fonts/IBMPlexMono-Medium.ttf)
+
 # ---- Factory presets embedded as binary data (resources/presets/*.xml) ----
 file(GLOB PENTAGRIT_PRESET_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/presets/*.xml")
 juce_add_binary_data(PentagritPresetData
@@ -43,7 +54,8 @@ target_link_libraries(PentagritCore INTERFACE
   PentagritCompilerSettings
   PentagritPresetData
   juce::juce_audio_utils
-  juce::juce_dsp)
+  juce::juce_dsp
+  PentagritUiAssets)
 
 # ---- Plugin ----
 set(PENTAGRIT_FORMATS VST3 Standalone)

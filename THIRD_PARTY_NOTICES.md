@@ -10,7 +10,7 @@ Pentagrit itself is licensed under AGPL-3.0-or-later. It uses the components bel
 | [clap-juce-extensions](https://github.com/free-audio/clap-juce-extensions) | commit 7adee3a1bd4684d4caa5601100e364abccff4b4d | MIT (Copyright 2019-2020 Paul Walker) | CLAP wrapper for JUCE |
 | [Catch2](https://github.com/catchorg/Catch2) | v3.16.1 | BSL-1.0 | Unit tests only, not shipped |
 | [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake) | v0.43.2 | MIT | Dependency fetching at build time, not shipped |
-| [IBM Plex](https://github.com/IBM/plex) fonts | planned | SIL OFL-1.1 | UI typography (planned, not yet included) |
+| [IBM Plex](https://github.com/IBM/plex) fonts | Plex Sans 3.005, Plex Mono 2.3 | SIL OFL-1.1 (`resources/ui/fonts/OFL.txt`) | UI typography, embedded in the plugin binary |
 | [pluginval](https://github.com/Tracktion/pluginval) | CI only | GPL-3.0 | Plugin validation in CI, not linked or shipped |
 
 Full licence texts are available in the respective upstream repositories and in the dependency sources fetched during the build. When binaries are distributed, the notices above must accompany them.
