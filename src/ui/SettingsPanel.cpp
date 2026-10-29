@@ -659,16 +659,14 @@ void SettingsPanel::buildInterface(Page& page)
     page.add(heading("Controls"), 28);
     addRow("Double-click on a knob", {},
            seg({"Reset to default", "Type value"}, s.doubleClick == DoubleClick::reset ? 0 : 1,
-               [this](int i)
-               {
+               [this](int i) {
                    apply([i](UserSettings& u)
                          { u.doubleClick = i == 0 ? DoubleClick::reset : DoubleClick::type; });
                }),
            260, 44);
     addRow("Knob drag mode", {},
            seg({"Vertical", "Circular"}, s.knobMode == KnobMode::vertical ? 0 : 1,
-               [this](int i)
-               {
+               [this](int i) {
                    apply([i](UserSettings& u)
                          { u.knobMode = i == 0 ? KnobMode::vertical : KnobMode::circular; });
                }),
