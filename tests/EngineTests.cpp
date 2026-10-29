@@ -656,37 +656,3 @@ TEST_CASE("Fuzz: random parameters every block never produce NaN, Inf or huge pe
     INFO("worst peak " << worst);
     CHECK(worst < 1000.0f); // +60 dBFS
 }
-
-TEST_CASE("Engine CPU cost per oversampling factor", "[.perf]")
-{
-    const double sr = 48000.0;
-    const int block = 512;
-    const int numBlocks = static_cast<int>(sr * 10 / block);
-    for (auto f : kFactors)
-    {
-        EngineSettings s;
-        s.os = f;
-        s.numBands = 5;
-        for (auto& b : s.bands)
-        {
-            b.sat = SatType::tube;
-            b.attackDb = 6.0f;
-        }
-        s.autoGain = true;
-        auto e = makeEngine(sr, block, 2, s);
-        const auto x = noise(static_cast<size_t>(block), 1, 0.3f);
-        juce::AudioBuffer<float> buf(2, block);
-        const auto t0 = juce::Time::getHighResolutionTicks();
-        for (int i = 0; i < numBlocks; ++i)
-        {
-            for (int c = 0; c < 2; ++c)
-                std::copy(x.begin(), x.end(), buf.getWritePointer(c));
-            e->setSettings(s);
-            e->process(buf);
-        }
-        const double secs =
-            juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - t0);
-        WARN("factor x" << (1 << static_cast<int>(f)) << ": " << (100.0 * secs / 10.0)
-                        << " % of one core (5 bands, stereo, 48 kHz)");
-    }
-}

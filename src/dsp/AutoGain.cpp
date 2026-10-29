@@ -57,24 +57,33 @@ void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
 
     // Measurement always runs so enabling does not start from an empty window.
     float mRef = meanRef_, mWet = meanWet_;
-    for (size_t i = 0; i < n; ++i)
+    constexpr size_t kChunk = 256;
+    float pr[kChunk], pw[kChunk];
+    for (size_t start = 0; start < n; start += kChunk)
     {
-        float r = 0.0f, w = 0.0f;
-        if (i < refN)
-            for (size_t c = 0; c < refCh; ++c)
-            {
-                const float v = ref.getSample(static_cast<int>(c), static_cast<int>(i));
-                r += v * v;
-            }
+        const size_t len = std::min(kChunk, n - start);
+        // Instantaneous channel-averaged power (vectorizable), then the serial one-pole.
+        std::fill(pr, pr + len, 0.0f);
+        std::fill(pw, pw + len, 0.0f);
+        const size_t refLen = start < refN ? std::min(len, refN - start) : 0;
+        for (size_t c = 0; c < refCh; ++c)
+        {
+            const float* d = ref.getChannelPointer(c) + start;
+            for (size_t i = 0; i < refLen; ++i)
+                pr[i] += d[i] * d[i];
+        }
         for (size_t c = 0; c < wetCh; ++c)
         {
-            const float v = wet.getSample(static_cast<int>(c), static_cast<int>(i));
-            w += v * v;
+            const float* d = wet.getChannelPointer(c) + start;
+            for (size_t i = 0; i < len; ++i)
+                pw[i] += d[i] * d[i];
         }
-        r *= invRefCh;
-        w *= invWetCh;
-        mRef = r + powCoeff_ * (mRef - r);
-        mWet = w + powCoeff_ * (mWet - w);
+        for (size_t i = 0; i < len; ++i)
+        {
+            const float r = pr[i] * invRefCh, w = pw[i] * invWetCh;
+            mRef = r + powCoeff_ * (mRef - r);
+            mWet = w + powCoeff_ * (mWet - w);
+        }
     }
     if (mRef < 1.0e-20f)
         mRef = 0.0f;

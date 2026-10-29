@@ -13,7 +13,8 @@ add_executable(PentagritTests
   AllocationTests.cpp
   EditorTests.cpp
   PresetTests.cpp
-  SettingsTests.cpp)
+  SettingsTests.cpp
+  PerfTests.cpp)
 
 target_link_libraries(PentagritTests PRIVATE PentagritCore Catch2::Catch2)
 target_include_directories(PentagritTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
