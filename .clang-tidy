@@ -1,0 +1,10 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  modernize-use-override,
+  modernize-use-nullptr,
+  readability-braces-around-statements
+WarningsAsErrors: ''
+HeaderFilterRegex: 'src/.*'
