@@ -20,6 +20,36 @@ PentagritAudioProcessor::PentagritAudioProcessor()
       apvts_(*this, nullptr, juce::Identifier(kStateTag), createParameterLayout()), params_(apvts_),
       presetManager_(apvts_)
 {
+    // The user preset folder and the startup preset come from the per-user settings. A host that restores a
+    // saved state calls setStateInformation() afterwards, which replaces the whole state (including the
+    // preset), so the startup preset never overrides a restored session.
+    const auto& s = settings_->get();
+    if (s.presetFolder.isNotEmpty())
+        presetManager_.setUserFolder(settings_->getEffectivePresetFolder());
+    SettingsManager::applyStartupPreset(s, presetManager_);
+
+    settings_->addChangeListener(this);
+    presetManager_.addChangeListener(this);
+}
+
+PentagritAudioProcessor::~PentagritAudioProcessor()
+{
+    presetManager_.removeChangeListener(this);
+    settings_->removeChangeListener(this);
+}
+
+void PentagritAudioProcessor::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    if (source == &presetManager_)
+    {
+        settings_->setLastPreset(SettingsManager::toRef(presetManager_.getCurrentEntry()));
+    }
+    else if (source == &*settings_)
+    {
+        const auto folder = settings_->getEffectivePresetFolder();
+        if (folder != presetManager_.getUserFolder())
+            presetManager_.setUserFolder(folder);
+    }
 }
 
 const juce::String PentagritAudioProcessor::getName() const

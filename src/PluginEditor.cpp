@@ -52,6 +52,19 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     footer_.setInterceptsMouseClicks(false, false);
     content_.onResized = [this] { layoutContent(); };
 
+    // Preset bar in the top bar; its messages are shown as footer toasts.
+    presetBar_ = std::make_unique<PresetBar>(processor_.getPresetManager());
+    presetBar_->onMessage = [this](const juce::String& m) { showToast(m); };
+    topBar_.presetSlot().addAndMakeVisible(*presetBar_);
+    topBar_.presetSlot().resized();
+    topBar_.onSettingsClicked = [this]
+    {
+        if (isSettingsOpen())
+            closeSettings();
+        else
+            openSettings();
+    };
+
     numBands_ =
         juce::jlimit(2, kMaxBands, juce::roundToInt(apvts.getRawParameterValue(pid::numBands)->load()));
     numBandsAttachment_ = std::make_unique<juce::ParameterAttachment>(
@@ -60,8 +73,9 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
 
     // Size: persisted (APVTS uiWidth/uiHeight) when it has our aspect ratio, base size otherwise.
     const auto stored = processor_.getUiSize();
-    int w = kBaseWidth, h = kFullHeight;
-    const float aspect = static_cast<float>(kBaseWidth) / static_cast<float>(kFullHeight);
+    options_ = processor_.getSettings().toUiOptions(); // per-user settings (layout decides the base height)
+    int w = kBaseWidth, h = baseHeight();
+    const float aspect = static_cast<float>(kBaseWidth) / static_cast<float>(baseHeight());
     if (std::abs(static_cast<float>(stored.x) / static_cast<float>(stored.y) - aspect) < 0.02f &&
         stored.x >= kBaseWidth * kMinScale && stored.x <= kBaseWidth * kMaxScale)
     {
@@ -77,10 +91,14 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     setSize(w, h);
     lastTickMs_ = juce::Time::getMillisecondCounterHiRes();
     refreshNow();
+    processor_.getSettings().addChangeListener(this);
 }
 
 PentagritAudioProcessorEditor::~PentagritAudioProcessorEditor()
 {
+    processor_.getSettings().removeChangeListener(this);
+    settingsPanel_.reset();
+    presetBar_.reset();
     stopTimer();
     removeMouseListener(this);
     tooltip_.reset();
@@ -160,6 +178,32 @@ void PentagritAudioProcessorEditor::showToast(const juce::String& text, int ms)
     toastUntilMs_ = juce::Time::getMillisecondCounterHiRes() + ms;
 }
 
+void PentagritAudioProcessorEditor::openSettings()
+{
+    if (settingsPanel_ == nullptr)
+    {
+        settingsPanel_ = std::make_unique<ui::SettingsPanel>(processor_);
+        settingsPanel_->onClose = [this] { closeSettings(); };
+        content_.addChildComponent(*settingsPanel_);
+    }
+    settingsPanel_->setBounds(content_.getLocalBounds());
+    settingsPanel_->showTab(settingsPanel_->currentTab());
+    settingsPanel_->setVisible(true);
+    settingsPanel_->toFront(true);
+    settingsPanel_->grabKeyboardFocus();
+}
+
+void PentagritAudioProcessorEditor::closeSettings()
+{
+    if (settingsPanel_ != nullptr)
+        settingsPanel_->setVisible(false); // kept (hidden): this may run from one of its own callbacks
+}
+
+void PentagritAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    setUiOptions(processor_.getSettings().toUiOptions());
+}
+
 void PentagritAudioProcessorEditor::mouseEnter(const juce::MouseEvent& e)
 {
     if (juce::Time::getMillisecondCounterHiRes() < toastUntilMs_)
@@ -224,6 +268,8 @@ void PentagritAudioProcessorEditor::layoutContent()
     crossover_.setVisible(!compact);
     crossover_.setBounds(kMargin, kCrossoverY, w - 2 * kMargin, kCrossoverH);
     footer_.setBounds(0, h - kFooterH, w, kFooterH);
+    if (settingsPanel_ != nullptr)
+        settingsPanel_->setBounds(0, 0, w, h);
 
     const int bodyTop = compact ? kCrossoverY : kCrossoverY + kCrossoverH + kMargin;
     const int bodyBottom = h - kFooterH - kMargin;
