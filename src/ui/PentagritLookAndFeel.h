@@ -17,10 +17,10 @@ inline const juce::Identifier kind{"pgKind"}; // Button: "mute" | "solo" | "bypa
 class PentagritLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
-    explicit PentagritLookAndFeel(Theme t = Theme::dark);
+    explicit PentagritLookAndFeel(Style t = Style::studioDark);
 
-    void setTheme(Theme t);
-    Theme theme() const noexcept { return theme_; }
+    void setStyle(Style t);
+    Style style() const noexcept { return style_; }
     const Palette& pal() const noexcept { return *pal_; }
 
     // Palette of the look-and-feel used by `c` (dark when it is not ours).
@@ -45,7 +45,7 @@ public:
 private:
     void applyColours();
 
-    Theme theme_;
+    Style style_;
     const Palette* pal_;
 };
 } // namespace pentagrit::ui

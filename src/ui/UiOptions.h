@@ -27,7 +27,7 @@ enum class KnobMode
 // live by PentagritAudioProcessorEditor::setUiOptions().
 struct UiOptions
 {
-    Theme theme{Theme::dark};
+    Style style{Style::studioDark};
     Layout layout{Layout::full};
     bool tooltips = true;
     DoubleClick dc{DoubleClick::reset};

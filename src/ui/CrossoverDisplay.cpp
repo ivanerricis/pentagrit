@@ -182,12 +182,11 @@ void CrossoverDisplay::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
     const auto area = getLocalBounds().toFloat();
-    g.setColour(p.bg1);
-    g.fillRoundedRectangle(area, 6.0f);
+    fillPanel(g, area, p);
 
     const auto plot = plotArea();
     g.setColour(p.bg0);
-    g.fillRoundedRectangle(plot, 3.0f);
+    g.fillRoundedRectangle(plot, p.rSmall);
 
     // Grid: vertical lines at 1-2-5 steps, horizontal quarters.
     static constexpr float gridHz[] = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
@@ -236,7 +235,7 @@ void CrossoverDisplay::paint(juce::Graphics& g)
         }
 
         g.setColour(col);
-        g.setFont(fonts::sans(11.0f, fonts::Weight::semiBold));
+        g.setFont(fonts::display(11.0f, fonts::Weight::semiBold));
         g.drawText("B" + juce::String(b + 1),
                    juce::Rectangle<float>(x0 + 6.0f, plot.getY() + 4.0f, 28.0f, 14.0f).toNearestInt(),
                    juce::Justification::centredLeft, false);
@@ -256,14 +255,14 @@ void CrossoverDisplay::paint(juce::Graphics& g)
     {
         const float x = freqToX(shownHz(i));
         const bool active = hover_ == i || dragging_ == i;
-        g.setColour(p.ink);
+        g.setColour(p.act);
         g.fillRect(x - 1.0f, plot.getY(), 2.0f, plot.getHeight());
         const auto txt = xover::format(shownHz(i));
         const float w = 56.0f;
         const auto chip = juce::Rectangle<float>(x - w * 0.5f, 4.0f, w, 18.0f);
-        g.setColour(active ? p.ink : p.bg3);
-        g.fillRoundedRectangle(chip, 3.0f);
-        g.setColour(active ? p.bg0 : p.ink);
+        g.setColour(active ? p.act : p.bg3);
+        g.fillRoundedRectangle(chip, p.rSmall);
+        g.setColour(active ? p.onAct : p.ink);
         g.setFont(fonts::mono(10.5f, fonts::Weight::medium));
         g.drawText(txt, chip.toNearestInt(), juce::Justification::centred, false);
     }

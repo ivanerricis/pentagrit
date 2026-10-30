@@ -91,35 +91,38 @@ TEST_CASE("Editor zoom levels", "[gui][Editor]")
     }
 }
 
-TEST_CASE("Editor layouts and themes", "[gui][Editor]")
+TEST_CASE("Editor layouts and styles", "[gui][Editor]")
 {
     PentagritAudioProcessor processor;
     PentagritAudioProcessorEditor editor(processor);
 
-    for (auto theme : {ui::Theme::dark, ui::Theme::light})
-        for (auto layout : {ui::Layout::full, ui::Layout::compact})
-        {
-            ui::UiOptions o;
-            o.theme = theme;
-            o.layout = layout;
-            editor.setUiOptions(o);
-            editor.refreshNow();
+    for (int bands : {3, 5})
+        for (int si = 0; si < ui::kNumStyles; ++si)
+            for (auto layout : {ui::Layout::full, ui::Layout::compact})
+            {
+                setValue(processor, pid::numBands, static_cast<float>(bands));
+                const auto style = static_cast<ui::Style>(si);
+                ui::UiOptions o;
+                o.style = style;
+                o.layout = layout;
+                editor.setUiOptions(o);
+                editor.refreshNow();
 
-            const bool compact = layout == ui::Layout::compact;
-            const juce::String name = juce::String(theme == ui::Theme::dark ? "dark" : "light") + "_" +
-                                      (compact ? "compact" : "full");
-            INFO(name);
-            CHECK(editor.isCompact() == compact);
-            CHECK(editor.getWidth() == ui::kBaseWidth);
-            CHECK(editor.getHeight() == (compact ? ui::kCompactHeight : ui::kFullHeight));
-            CHECK(editor.getCrossover().isVisible() == !compact);
+                const bool compact = layout == ui::Layout::compact;
+                const juce::String name = juce::String(ui::styleId(style)) + "_" + juce::String(bands) +
+                                          "b_" + (compact ? "compact" : "full");
+                INFO(name);
+                CHECK(editor.isCompact() == compact);
+                CHECK(editor.getWidth() == ui::kBaseWidth);
+                CHECK(editor.getHeight() == (compact ? ui::kCompactHeight : ui::kFullHeight));
+                CHECK(editor.getCrossover().isVisible() == !compact);
 
-            auto img = snapshot(editor, name);
-            CHECK(img.getHeight() == editor.getHeight());
-            CHECK(distinctColours(img) > 30);
-            // The ground colour of the theme is present (top-left corner).
-            CHECK(img.getPixelAt(1, 1) == ui::palette(theme).bg0);
-        }
+                auto img = snapshot(editor, name);
+                CHECK(img.getHeight() == editor.getHeight());
+                CHECK(distinctColours(img) > 30);
+                // The ground colour of the theme is present (top-left corner).
+                CHECK(img.getPixelAt(1, 1) == ui::palette(style).bg0);
+            }
 }
 
 TEST_CASE("Editor collapses to the number of bands", "[gui][Editor]")

@@ -72,7 +72,7 @@ TEST_CASE("Settings defaults", "[settings]")
     SettingsManager m(tmp.file);
     const auto& s = m.get();
     CHECK(s.zoomPercent == 100);
-    CHECK(s.theme == ui::Theme::dark);
+    CHECK(s.style == ui::Style::studioDark);
     CHECK(s.layout == ui::Layout::full);
     CHECK(s.tooltips);
     CHECK(s.doubleClick == ui::DoubleClick::reset);
@@ -108,7 +108,7 @@ TEST_CASE("Settings round trip", "[settings]")
         SettingsManager m(tmp.file);
         auto s = m.get();
         s.zoomPercent = 150;
-        s.theme = ui::Theme::light;
+        s.style = ui::Style::paperLight;
         s.layout = ui::Layout::compact;
         s.tooltips = false;
         s.doubleClick = ui::DoubleClick::type;
@@ -129,7 +129,7 @@ TEST_CASE("Settings round trip", "[settings]")
     SettingsManager m(tmp.file);
     const auto& s = m.get();
     CHECK(s.zoomPercent == 150);
-    CHECK(s.theme == ui::Theme::light);
+    CHECK(s.style == ui::Style::paperLight);
     CHECK(s.layout == ui::Layout::compact);
     CHECK_FALSE(s.tooltips);
     CHECK(s.doubleClick == ui::DoubleClick::type);
@@ -162,7 +162,7 @@ TEST_CASE("Settings corrupt or missing file is tolerated", "[settings]")
         SettingsManager m(tmp.file);
         CHECK_FALSE(m.loadedOk());
         CHECK(m.get().zoomPercent == 100);
-        CHECK(m.get().theme == ui::Theme::dark);
+        CHECK(m.get().style == ui::Style::studioDark);
         auto s = m.get();
         s.zoomPercent = 125; // can be saved over the corrupt file
         m.set(s);
@@ -182,7 +182,7 @@ TEST_CASE("Settings corrupt or missing file is tolerated", "[settings]")
         CHECK(m.get().sensitivity == Catch::Approx(1.0f));
         CHECK(m.get().meterRefreshHz == 30);
         CHECK(m.get().meterRelease == Catch::Approx(5.0f));
-        CHECK(m.get().theme == ui::Theme::dark);
+        CHECK(m.get().style == ui::Style::studioDark);
         CHECK(m.get().startupMode == StartupMode::last); // "specific" without a preset
     }
     SECTION("set() validates")
@@ -249,7 +249,7 @@ TEST_CASE("Settings convert to UiOptions", "[settings]")
 {
     UserSettings s;
     s.zoomPercent = 125;
-    s.theme = ui::Theme::light;
+    s.style = ui::Style::paperLight;
     s.layout = ui::Layout::compact;
     s.tooltips = false;
     s.doubleClick = ui::DoubleClick::type;
@@ -261,7 +261,7 @@ TEST_CASE("Settings convert to UiOptions", "[settings]")
     s.showCpu = false;
     auto o = SettingsManager::toUiOptions(s);
     CHECK(o.zoomPercent == 125);
-    CHECK(o.theme == ui::Theme::light);
+    CHECK(o.style == ui::Style::paperLight);
     CHECK(o.layout == ui::Layout::compact);
     CHECK_FALSE(o.tooltips);
     CHECK(o.dc == ui::DoubleClick::type);
@@ -406,13 +406,13 @@ TEST_CASE("Settings panel changes apply to the shared settings", "[gui][settings
     auto& settings = processor.getSettings();
 
     auto s = settings.get();
-    s.theme = ui::Theme::light;
+    s.style = ui::Style::paperLight;
     s.layout = ui::Layout::compact;
     s.zoomPercent = 125;
     s.showCpu = false;
     settings.set(s);
     CHECK(editor.isCompact());
-    CHECK(editor.getUiOptions().theme == ui::Theme::light);
+    CHECK(editor.getUiOptions().style == ui::Style::paperLight);
     CHECK(editor.getUiOptions().zoomPercent == 125);
     CHECK_FALSE(editor.getUiOptions().showCpu);
     CHECK(editor.getHeight() == ui::kCompactHeight);
@@ -466,7 +466,7 @@ TEST_CASE("Editor with preset bar and settings overlay", "[gui][settings][Editor
         auto img = snapshot(editor, "editor_settings_tab" + juce::String(t));
         CHECK(distinctColours(img) > 30);
         // the overlay dims the editor: the corner is no longer the plain ground colour
-        CHECK(img.getPixelAt(1, 1) != ui::palette(ui::Theme::dark).bg0);
+        CHECK(img.getPixelAt(1, 1) != ui::palette(ui::Style::studioDark).bg0);
     }
 
     // The gear toggles; Done / Esc close.
@@ -480,13 +480,79 @@ TEST_CASE("Editor with preset bar and settings overlay", "[gui][settings][Editor
     editor.getPresetBar()->onMessage("Saved \"X\"");
     CHECK(editor.getFooter().hint().contains("Saved"));
 
-    // Light theme and compact layout with the overlay open.
+    // Light style and compact layout with the overlay open.
     auto s = processor.getSettings().get();
-    s.theme = ui::Theme::light;
+    s.style = ui::Style::paperLight;
     s.layout = ui::Layout::compact;
     processor.getSettings().set(s);
     editor.openSettings();
     CHECK(editor.getSettingsPanel()->getBounds() == editor.content().getLocalBounds());
     CHECK(distinctColours(snapshot(editor, "editor_settings_light_compact")) > 30);
     processor.getSettings().resetToDefaults();
+}
+
+namespace
+{
+double luminance(juce::Colour c)
+{
+    auto lin = [](float v) { return v <= 0.03928f ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(c.getFloatRed()) + 0.7152 * lin(c.getFloatGreen()) + 0.0722 * lin(c.getFloatBlue());
+}
+double contrast(juce::Colour a, juce::Colour b)
+{
+    const double la = luminance(a), lb = luminance(b);
+    return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
+}
+} // namespace
+
+TEST_CASE("Every style round trips through the settings file", "[settings][styles]")
+{
+    for (int i = 0; i < ui::kNumStyles; ++i)
+    {
+        const auto st = static_cast<ui::Style>(i);
+        INFO(ui::styleId(st));
+        TempFile tmp;
+        {
+            SettingsManager m(tmp.file);
+            auto s = m.get();
+            s.style = st;
+            m.set(s);
+        }
+        SettingsManager m(tmp.file);
+        CHECK(m.get().style == st);
+        CHECK(SettingsManager::toUiOptions(m.get()).style == st);
+    }
+}
+
+TEST_CASE("Legacy theme values migrate to styles", "[settings][styles]")
+{
+    auto load = [](const char* value)
+    {
+        TempFile tmp;
+        tmp.file.replaceWithText(juce::String("<PROPERTIES><VALUE name=\"uiTheme\" val=\"") + value +
+                                 "\"/></PROPERTIES>");
+        SettingsManager m(tmp.file);
+        return m.get().style;
+    };
+    CHECK(load("dark") == ui::Style::studioDark);
+    CHECK(load("light") == ui::Style::paperLight);
+    CHECK(load("purple") == ui::Style::studioDark);
+    CHECK(load("") == ui::Style::studioDark);
+}
+
+TEST_CASE("Style palettes are legible", "[styles]")
+{
+    for (int i = 0; i < ui::kNumStyles; ++i)
+    {
+        const auto st = static_cast<ui::Style>(i);
+        INFO(ui::styleName(st));
+        const auto& p = ui::palette(st);
+        CHECK(contrast(p.ink, p.bg1) >= 4.5);
+        CHECK(contrast(p.ink2, p.bg1) >= 3.0);
+        CHECK(contrast(p.onAct, p.act) >= 4.5);
+        for (auto c : {p.mute, p.solo, p.bypass})
+            CHECK(contrast(p.onBand, c) >= 4.5);
+        // identifiers are stable and unique
+        CHECK(ui::styleFromId(ui::styleId(st)) == st);
+    }
 }

@@ -33,7 +33,7 @@ struct PresetRef
 struct UserSettings
 {
     int zoomPercent = 100; // 75 / 100 / 125 / 150 / 200
-    ui::Theme theme = ui::Theme::dark;
+    ui::Style style = ui::Style::studioDark;
     ui::Layout layout = ui::Layout::full;
     bool tooltips = true;
     ui::DoubleClick doubleClick = ui::DoubleClick::reset;
