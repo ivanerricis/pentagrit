@@ -16,8 +16,8 @@ CrossoverDisplay::CrossoverDisplay(juce::AudioProcessorValueTreeState& apvts, Me
     : apvts_(apvts), meters_(meters)
 {
     setTitle("Crossover display");
-    setTooltip(
-        "Crossover: drag the handles (log 20 Hz to 20 kHz, 1/3 octave minimum spacing), double-click resets");
+    setTooltip("Crossover: drag the handles (log 20 Hz to 20 kHz, 1/3 octave minimum spacing), Ctrl+click or "
+               "double-click types a frequency, Ctrl+click resets");
     for (size_t i = 0; i < 4; ++i)
     {
         auto* param = apvts.getParameter(pid::xover[i]);
@@ -135,6 +135,17 @@ void CrossoverDisplay::mouseExit(const juce::MouseEvent&)
 
 void CrossoverDisplay::mouseDown(const juce::MouseEvent& e)
 {
+    if (editor_ != nullptr)
+        endTyping(true);
+    if (e.mods.isLeftButtonDown() && e.mods.isCommandDown())
+    {
+        // Ctrl+click (Cmd+click on macOS) resets the handle, like on the knobs.
+        const int h = handleAt(e.position.x);
+        if (h >= 0)
+            resetHandle(h);
+        dragging_ = -1;
+        return;
+    }
     dragging_ = handleAt(e.position.x);
     if (dragging_ >= 0)
     {
@@ -167,15 +178,66 @@ void CrossoverDisplay::mouseUp(const juce::MouseEvent&)
 
 void CrossoverDisplay::mouseDoubleClick(const juce::MouseEvent& e)
 {
-    const int h = handleAt(e.position.x);
-    if (h < 0)
+    if (!e.mods.isLeftButtonDown() || e.mods.isCommandDown())
         return;
-    auto* param = apvts_.getParameter(pid::xover[static_cast<size_t>(h)]);
+    const int h = handleAt(e.position.x);
+    if (h >= 0)
+        beginTyping(h);
+}
+
+void CrossoverDisplay::beginTyping(int h)
+{
+    endTyping(false);
+    typingHandle_ = h;
+    editor_ = std::make_unique<juce::TextEditor>();
+    editor_->setTitle("Crossover frequency (Hz)");
+    editor_->setJustification(juce::Justification::centred);
+    editor_->setFont(fonts::mono(10.5f, fonts::Weight::regular));
+    editor_->setIndents(0, 0);
+    editor_->setText(juce::String(juce::roundToInt(shownHz(h))), false);
+    editor_->onReturnKey = [this] { endTyping(true); };
+    editor_->onEscapeKey = [this] { endTyping(false); };
+    editor_->onFocusLost = [this] { endTyping(true); };
+    addAndMakeVisible(*editor_);
+    const auto a = plotArea();
+    const int w = 56;
+    editor_->setBounds(juce::roundToInt(freqToX(shownHz(h))) - w / 2, juce::roundToInt(a.getY()) + 2, w, 16);
+    editor_->grabKeyboardFocus();
+    editor_->selectAll();
+}
+
+void CrossoverDisplay::endTyping(bool commit)
+{
+    if (editor_ == nullptr)
+        return;
+    auto ed = std::move(editor_);
+    ed->onFocusLost = nullptr;
+    const int h = typingHandle_;
+    typingHandle_ = -1;
+    if (commit)
+    {
+        const auto text = ed->getText().retainCharacters("0123456789.");
+        if (text.isNotEmpty())
+            commitHz(h, text.getFloatValue());
+    }
+    removeChildComponent(ed.get());
+    // Destroy asynchronously: this can be called from the editor's own callback.
+    juce::MessageManager::callAsync([keep = std::shared_ptr<juce::TextEditor>(std::move(ed))] {});
+    repaint();
+}
+
+void CrossoverDisplay::commitHz(int h, float hz)
+{
     std::array<float, 4> cur{};
     for (size_t i = 0; i < 4; ++i)
         cur[i] = apvts_.getRawParameterValue(pid::xover[i])->load();
-    const float def = xover::clamp(h, param->convertFrom0to1(param->getDefaultValue()), cur, numBands_);
-    attachments_[static_cast<size_t>(h)]->setValueAsCompleteGesture(def);
+    attachments_[static_cast<size_t>(h)]->setValueAsCompleteGesture(xover::clamp(h, hz, cur, numBands_));
+}
+
+void CrossoverDisplay::resetHandle(int h)
+{
+    auto* param = apvts_.getParameter(pid::xover[static_cast<size_t>(h)]);
+    commitHz(h, param->convertFrom0to1(param->getDefaultValue()));
 }
 
 void CrossoverDisplay::paint(juce::Graphics& g)

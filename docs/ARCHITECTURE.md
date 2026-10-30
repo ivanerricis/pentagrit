@@ -78,7 +78,7 @@ Minimum phase uses `juce::dsp::Oversampling` with `filterHalfBandPolyphaseIIR`, 
 
 ## Per-user settings (not implemented yet)
 
-Per-user UI settings (zoom, theme, layout, tooltips, double-click, knob mode/sensitivity, meter hold/release/refresh,
+Per-user UI settings (zoom, theme, layout, tooltips, knob mode/sensitivity, value step of the dB knobs (`valueStep`: continuous/0.1/0.5/1), meter hold/release/refresh,
 show CPU, preset folder, startup preset, update-check opt-in) are NOT parameters and not part of presets. They live in a
 `juce::PropertiesFile` (`Pentagrit/settings.settings` in the user app-data folder), owned later by a `SettingsManager` (WP9).
 

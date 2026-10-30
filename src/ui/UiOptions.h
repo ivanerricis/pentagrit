@@ -11,12 +11,6 @@ enum class Layout
     compact // 1100 x 540, no crossover display, From/To fields per strip
 };
 
-enum class DoubleClick
-{
-    reset, // double-click returns the knob to its default
-    type   // double-click opens an inline value editor
-};
-
 enum class KnobMode
 {
     vertical,
@@ -30,8 +24,8 @@ struct UiOptions
     Style style{Style::studioDark};
     Layout layout{Layout::full};
     bool tooltips = true;
-    DoubleClick dc{DoubleClick::reset};
     KnobMode knob{KnobMode::vertical};
+    float valueStepDb = 0.0f;           // drag step for dB knobs: 0 (continuous), 0.1, 0.5 or 1
     float sensitivity = 0.5f;           // 0 (fine) .. 1 (fast), 0.5 = 170 px for the full range
     float meterHoldSec = 1.0f;          // peak-hold marker; 0 = off, < 0 = infinite
     float meterReleaseDbPerSec = 20.0f; // meter fall speed
