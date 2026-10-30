@@ -65,7 +65,7 @@ Frequency axis: log 20 Hz to 20 kHz, `x = pad + log(f/20)/log(1000) * (W - 2 pad
 
 ## Interaction
 
-- Knobs: vertical drag (about 170 px = full range), Shift = fine (x4), double-click = default, wheel = 2% steps. Use `juce::Slider::RotaryVerticalDrag`, `setDoubleClickReturnValue`.
+- Knobs: vertical drag (about 170 px = full range), Shift = fine (x4), double-click = type a value, Ctrl/Cmd+click = reset to default, wheel = 2% steps. Use `juce::Slider::RotaryVerticalDrag`, `setDoubleClickReturnValue`.
 - M/S/B are per-band toggles; solo dims all non-solo strips; a muted strip dims to 45%.
 - **Collapse (numBands < 5):** only strips 1..N exist on screen; they widen to fill the body (use `juce::FlexBox` / `Grid` with `flexGrow 1`, minimum width 168, and hide strips N+1..5 with `setVisible(false)`). Master stays 190 px wide. Band colours stay in order (band1..bandN). The crossover display draws only the N active band regions and N-1 handles. Parameters of hidden bands keep their values. **Default numBands = 3**, default crossovers **120 / 1200 / 3500 / 8000 Hz** (3 bands use 120/1200, 4 bands 120/1200/3500, 5 bands all four). When the band count rises, handle values are pushed up to keep the 1/3 octave spacing.
 - **Settings panel:** the gear icon (top bar right, 30 x 30) opens a modal overlay inside the editor (780 px wide card, 4 tabs: Interface, Audio, Presets, About & Support; Esc or click outside closes). Rows are `bg2` bars (label + description left, control right); controls are segmented selectors, switches (38 x 22), range sliders and buttons on `bg3`. Implement as a `Component` overlay with a `TabbedComponent` (or four child components); see the storage table below.
@@ -132,7 +132,7 @@ Per-user settings live in one `juce::PropertiesFile` (`ApplicationProperties`, f
 | Theme Dark / Light | `uiTheme` ("dark"/"light") | two `ColourScheme` presets in `PentagritLookAndFeel`; `lookAndFeelChanged()` + repaint; band colours come from the scheme |
 | Layout Full / Compact | `uiLayout` ("full"/"compact") | `PluginEditor::resized` switches the layout; hides `CrossoverDisplay`, shows per-strip `Label` fields (`setEditable(true)`) bound to `xover1..4` via `ParameterAttachment`; `setSize` 1100x680 or 1100x540 |
 | Tooltips on/off | `tooltips` (bool, true) | `TooltipWindow` member (message-thread owned) created/destroyed or `setMillisecondsBeforeTipAppears`; controls call `setTooltip` with the description |
-| Double-click: Reset / Type value | `dblClick` ("reset"/"type") | `Slider::setDoubleClickReturnValue` vs. a `Slider::setTextBoxStyle` popup editor (`showTextBox()` on double-click) |
+| Value step (dB knobs): Continuous / 0.1 / 0.5 / 1 | `valueStep` (dB, 0 = continuous) | `Slider::snapValue` override; Shift (fine) ignores it; typed values are not rounded. The legacy `dblClick` key is ignored (double-click always types, Ctrl/Cmd+click always resets) |
 | Knob drag: Vertical / Circular | `knobDrag` ("vertical"/"circular") | `Slider::RotaryVerticalDrag` vs `RotaryHorizontalVerticalDrag` / `Rotary` style via `setSliderStyle`; `setMouseDragSensitivity` for vertical |
 | Knob sensitivity (Fine..Fast) | `knobSens` (0..100, 50) | `Slider::setMouseDragSensitivity(int(170 / 4^((v-50)/50)))`; circular mode scales the angle delta (`SliderStyle::Rotary` uses `setRotaryParameters`) |
 | Meters: peak hold | `meterHold` (ms, 0 = off, 99999 = infinite, 1000) | `LevelMeter` hold-marker timer |

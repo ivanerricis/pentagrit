@@ -29,12 +29,44 @@ KnobSlider::KnobSlider()
     setPopupMenuEnabled(false);
 }
 
+void KnobSlider::mouseDown(const juce::MouseEvent& e)
+{
+    // Ctrl+click (Cmd+click on macOS) resets to the default value (a complete gesture), always active.
+    if (e.mods.isLeftButtonDown() && e.mods.isCommandDown())
+    {
+        resetClick_ = true;
+        juce::Slider::mouseDoubleClick(e); // returns to the double-click return value
+        return;
+    }
+    resetClick_ = false;
+    juce::Slider::mouseDown(e);
+}
+
+void KnobSlider::mouseDrag(const juce::MouseEvent& e)
+{
+    if (!resetClick_)
+        juce::Slider::mouseDrag(e);
+}
+
+void KnobSlider::mouseUp(const juce::MouseEvent& e)
+{
+    if (resetClick_)
+        resetClick_ = false;
+    else
+        juce::Slider::mouseUp(e);
+}
+
 void KnobSlider::mouseDoubleClick(const juce::MouseEvent& e)
 {
-    if (typeOnDoubleClick && onTypeRequest)
+    if (e.mods.isLeftButtonDown() && !e.mods.isCommandDown() && onTypeRequest)
         onTypeRequest();
-    else
-        juce::Slider::mouseDoubleClick(e);
+}
+
+double KnobSlider::snapValue(double attempted, DragMode)
+{
+    if (dragStep <= 0.0 || juce::ModifierKeys::currentModifiers.isShiftDown())
+        return attempted;
+    return juce::jlimit(getMinimum(), getMaximum(), quantiseToStep(attempted, dragStep));
 }
 
 void KnobSlider::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& w)
@@ -87,9 +119,7 @@ void LabelledKnob::applyOptions(const UiOptions& o)
     slider_.setMouseDragSensitivity(juce::jmax(
         20,
         juce::roundToInt(170.0f / std::pow(4.0f, (juce::jlimit(0.0f, 1.0f, o.sensitivity) - 0.5f) * 2.0f))));
-    slider_.typeOnDoubleClick = o.dc == DoubleClick::type;
-    if (o.dc != DoubleClick::type && editor_ != nullptr)
-        endTyping(false);
+    slider_.dragStep = isDbFormat(fmt_) ? static_cast<double>(o.valueStepDb) : 0.0;
 }
 
 void LabelledKnob::updateText()
@@ -155,6 +185,12 @@ void LabelledKnob::beginTyping()
     editor_->selectAll();
 }
 
+void LabelledKnob::commitText(const juce::String& text)
+{
+    slider_.setValue(juce::jlimit(slider_.getMinimum(), slider_.getMaximum(), parse(text)),
+                     juce::sendNotificationSync);
+}
+
 void LabelledKnob::endTyping(bool commit)
 {
     if (editor_ == nullptr)
@@ -162,11 +198,7 @@ void LabelledKnob::endTyping(bool commit)
     auto ed = std::move(editor_);
     ed->onFocusLost = nullptr;
     if (commit)
-    {
-        const auto v = parse(ed->getText());
-        slider_.setValue(juce::jlimit(slider_.getMinimum(), slider_.getMaximum(), v),
-                         juce::sendNotificationSync);
-    }
+        commitText(ed->getText());
     removeChildComponent(ed.get());
     // Destroy asynchronously: this can be called from the editor's own callback.
     juce::MessageManager::callAsync([keep = std::shared_ptr<juce::TextEditor>(std::move(ed))] {});

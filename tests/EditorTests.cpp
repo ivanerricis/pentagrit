@@ -177,7 +177,7 @@ TEST_CASE("Editor options apply live", "[gui][Editor]")
     PentagritAudioProcessorEditor editor(processor);
     ui::UiOptions o;
     o.tooltips = false;
-    o.dc = ui::DoubleClick::type;
+    o.valueStepDb = 0.5f;
     o.knob = ui::KnobMode::circular;
     o.sensitivity = 1.0f;
     o.meterHoldSec = 0.0f;
@@ -216,4 +216,96 @@ TEST_CASE("Editor resize keeps the aspect ratio and persists the size", "[gui][E
     }
     PentagritAudioProcessorEditor again(processor);
     CHECK(again.getWidth() == 825);
+}
+
+namespace
+{
+juce::MouseEvent makeMouse(juce::Component& c, juce::ModifierKeys mods, int clicks = 1)
+{
+    const auto src = juce::Desktop::getInstance().getMainMouseSource();
+    const juce::Point<float> pos(10.0f, 10.0f);
+    return {src,
+            pos,
+            mods,
+            1.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            &c,
+            &c,
+            juce::Time::getCurrentTime(),
+            pos,
+            juce::Time::getCurrentTime(),
+            clicks,
+            false};
+}
+} // namespace
+
+TEST_CASE("Value step quantisation helper", "[gui][knob]")
+{
+    CHECK(ui::quantiseToStep(1.234, 0.0) == Catch::Approx(1.234));
+    CHECK(ui::quantiseToStep(1.234, 0.1) == Catch::Approx(1.2));
+    CHECK(ui::quantiseToStep(1.26, 0.5) == Catch::Approx(1.5));
+    CHECK(ui::quantiseToStep(-1.26, 0.5) == Catch::Approx(-1.5));
+    CHECK(ui::quantiseToStep(2.4, 1.0) == Catch::Approx(2.0));
+    CHECK(ui::quantiseToStep(7.0, -1.0) == Catch::Approx(7.0));
+}
+
+TEST_CASE("Value step applies to dB knobs only", "[gui][knob]")
+{
+    PentagritAudioProcessor processor;
+    ui::LabelledKnob db(processor.getAPVTS(), pid::inGain, "In", "hint", ui::LabelledKnob::Fmt::dbSignedUnit,
+                        true, 44);
+    ui::LabelledKnob pct(processor.getAPVTS(), pid::mix, "Mix", "hint", ui::LabelledKnob::Fmt::percent, false,
+                         44);
+    ui::UiOptions o;
+    o.valueStepDb = 0.5f;
+    db.applyOptions(o);
+    pct.applyOptions(o);
+    CHECK(db.slider().dragStep == Catch::Approx(0.5));
+    CHECK(pct.slider().dragStep == 0.0);
+    o.valueStepDb = 0.0f;
+    db.applyOptions(o);
+    CHECK(db.slider().dragStep == 0.0);
+}
+
+TEST_CASE("Ctrl+click resets a knob and typed values are not rounded", "[gui][knob]")
+{
+    PentagritAudioProcessor processor;
+    ui::LabelledKnob knob(processor.getAPVTS(), pid::inGain, "In", "hint",
+                          ui::LabelledKnob::Fmt::dbSignedUnit, true, 44);
+    knob.setBounds(0, 0, 60, 80);
+    ui::UiOptions o;
+    o.valueStepDb = 1.0f;
+    knob.applyOptions(o);
+
+    knob.commitText("3.4");
+    CHECK(knob.slider().getValue() == Catch::Approx(3.4).margin(0.011));
+    CHECK(std::abs(raw(processor, pid::inGain) - 3.4f) < 0.011f);
+
+    auto& s = knob.slider();
+    s.mouseDown(makeMouse(s, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier |
+                                                juce::ModifierKeys::ctrlModifier |
+                                                juce::ModifierKeys::commandModifier)));
+    s.mouseUp(makeMouse(s, juce::ModifierKeys()));
+    CHECK(raw(processor, pid::inGain) == Catch::Approx(0.0f).margin(1.0e-4f));
+
+    // Double-click requests the value editor; with Ctrl it does not.
+    int requests = 0;
+    s.onTypeRequest = [&requests] { ++requests; };
+    s.mouseDoubleClick(makeMouse(s, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 2));
+    CHECK(requests == 1);
+}
+
+TEST_CASE("Crossover handle typed value and reset", "[gui][Editor]")
+{
+    PentagritAudioProcessor processor;
+    MeterState meters;
+    ui::CrossoverDisplay display(processor.getAPVTS(), meters);
+    display.setBounds(0, 0, 800, 200);
+    display.commitHz(0, 200.0f);
+    CHECK(raw(processor, pid::xover[0]) == Catch::Approx(200.0f).margin(0.5f));
+    display.resetHandle(0);
+    CHECK(raw(processor, pid::xover[0]) == Catch::Approx(120.0f).margin(0.5f));
 }

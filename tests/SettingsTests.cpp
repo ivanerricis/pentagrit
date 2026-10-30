@@ -75,7 +75,7 @@ TEST_CASE("Settings defaults", "[settings]")
     CHECK(s.style == ui::Style::studioDark);
     CHECK(s.layout == ui::Layout::full);
     CHECK(s.tooltips);
-    CHECK(s.doubleClick == ui::DoubleClick::reset);
+    CHECK(s.valueStepDb == 0.0f);
     CHECK(s.knobMode == ui::KnobMode::vertical);
     CHECK(s.sensitivity == Catch::Approx(0.5f));
     CHECK(s.meterHoldMs == 1000);
@@ -111,7 +111,7 @@ TEST_CASE("Settings round trip", "[settings]")
         s.style = ui::Style::paperLight;
         s.layout = ui::Layout::compact;
         s.tooltips = false;
-        s.doubleClick = ui::DoubleClick::type;
+        s.valueStepDb = 0.5f;
         s.knobMode = ui::KnobMode::circular;
         s.sensitivity = 0.8f;
         s.meterHoldMs = UserSettings::kInfiniteHold;
@@ -132,7 +132,7 @@ TEST_CASE("Settings round trip", "[settings]")
     CHECK(s.style == ui::Style::paperLight);
     CHECK(s.layout == ui::Layout::compact);
     CHECK_FALSE(s.tooltips);
-    CHECK(s.doubleClick == ui::DoubleClick::type);
+    CHECK(s.valueStepDb == Catch::Approx(0.5f));
     CHECK(s.knobMode == ui::KnobMode::circular);
     CHECK(s.sensitivity == Catch::Approx(0.8f));
     CHECK(s.meterHoldMs == UserSettings::kInfiniteHold);
@@ -252,7 +252,7 @@ TEST_CASE("Settings convert to UiOptions", "[settings]")
     s.style = ui::Style::paperLight;
     s.layout = ui::Layout::compact;
     s.tooltips = false;
-    s.doubleClick = ui::DoubleClick::type;
+    s.valueStepDb = 0.1f;
     s.knobMode = ui::KnobMode::circular;
     s.sensitivity = 0.25f;
     s.meterHoldMs = 500;
@@ -264,7 +264,7 @@ TEST_CASE("Settings convert to UiOptions", "[settings]")
     CHECK(o.style == ui::Style::paperLight);
     CHECK(o.layout == ui::Layout::compact);
     CHECK_FALSE(o.tooltips);
-    CHECK(o.dc == ui::DoubleClick::type);
+    CHECK(o.valueStepDb == Catch::Approx(0.1f));
     CHECK(o.knob == ui::KnobMode::circular);
     CHECK(o.sensitivity == Catch::Approx(0.25f));
     CHECK(o.meterHoldSec == Catch::Approx(0.5f));
@@ -555,4 +555,21 @@ TEST_CASE("Style palettes are legible", "[styles]")
         // identifiers are stable and unique
         CHECK(ui::styleFromId(ui::styleId(st)) == st);
     }
+}
+
+TEST_CASE("Value step is sanitised and the legacy double-click key is ignored", "[settings]")
+{
+    TempFile tmp;
+    REQUIRE(tmp.file.replaceWithText(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<PROPERTIES><VALUE name=\"dblClick\" val=\"type\"/>"
+        "<VALUE name=\"valueStep\" val=\"0.45\"/></PROPERTIES>"));
+    SettingsManager m(tmp.file);
+    CHECK(m.get().valueStepDb == Catch::Approx(0.5f));
+    auto s = m.get();
+    s.valueStepDb = 7.0f;
+    m.set(s);
+    CHECK(m.get().valueStepDb == Catch::Approx(1.0f));
+    s.valueStepDb = std::nanf("");
+    m.set(s);
+    CHECK(m.get().valueStepDb == 0.0f);
 }

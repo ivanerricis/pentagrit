@@ -684,13 +684,6 @@ void SettingsPanel::buildInterface(Page& page)
            sw(s.tooltips, [this](bool on) { apply([on](UserSettings& u) { u.tooltips = on; }); }), 38);
 
     page.add(heading("Controls"), 28);
-    addRow("Double-click on a knob", {},
-           seg({"Reset to default", "Type value"}, s.doubleClick == DoubleClick::reset ? 0 : 1,
-               [this](int i) {
-                   apply([i](UserSettings& u)
-                         { u.doubleClick = i == 0 ? DoubleClick::reset : DoubleClick::type; });
-               }),
-           260, 44);
     addRow("Knob drag mode", {},
            seg({"Vertical", "Circular"}, s.knobMode == KnobMode::vertical ? 0 : 1,
                [this](int i) {
@@ -698,6 +691,19 @@ void SettingsPanel::buildInterface(Page& page)
                          { u.knobMode = i == 0 ? KnobMode::vertical : KnobMode::circular; });
                }),
            200, 44);
+    {
+        static constexpr float steps[] = {0.0f, 0.1f, 0.5f, 1.0f};
+        int cur = 0;
+        for (int k = 0; k < 4; ++k)
+            if (std::abs(steps[k] - s.valueStepDb) < 1.0e-4f)
+                cur = k;
+        addRow("Value step",
+               "Drag step of the dB knobs (gain, attack, sustain, drive). Hold Shift for fine adjustment; "
+               "typed values are never rounded.",
+               seg({"Continuous", "0.1", "0.5", "1"}, cur,
+                   [this](int i) { apply([i](UserSettings& u) { u.valueStepDb = steps[i]; }); }),
+               300, 64);
+    }
     addRow("Knob sensitivity", "Shift while dragging is always 5x finer.",
            std::make_unique<SliderControl>(
                0, 100, 1, static_cast<double>(s.sensitivity) * 100.0, nullptr, "Fine", "Fast",

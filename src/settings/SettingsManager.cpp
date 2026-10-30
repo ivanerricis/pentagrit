@@ -24,7 +24,7 @@ constexpr const char* kZoom = "uiZoom";
 constexpr const char* kTheme = "uiTheme";
 constexpr const char* kLayout = "uiLayout";
 constexpr const char* kTooltips = "tooltips";
-constexpr const char* kDblClick = "dblClick";
+constexpr const char* kValueStep = "valueStep"; // the legacy "dblClick" key is ignored
 constexpr const char* kKnobDrag = "knobDrag";
 constexpr const char* kKnobSens = "knobSens";
 constexpr const char* kMeterHold = "meterHold";
@@ -113,6 +113,13 @@ UserSettings SettingsManager::sanitised(UserSettings s)
     s.sensitivity = juce::jlimit(0.0f, 1.0f, std::isfinite(s.sensitivity) ? s.sensitivity : 0.5f);
     s.meterHoldMs = juce::jlimit(0, UserSettings::kInfiniteHold, s.meterHoldMs);
     s.meterRelease = juce::jlimit(5.0f, 60.0f, std::isfinite(s.meterRelease) ? s.meterRelease : 20.0f);
+    {
+        float best = 0.0f; // snap to the nearest allowed step (0 = continuous)
+        for (float c : {0.0f, 0.1f, 0.5f, 1.0f})
+            if (std::isfinite(s.valueStepDb) && std::abs(c - s.valueStepDb) < std::abs(best - s.valueStepDb))
+                best = c;
+        s.valueStepDb = best;
+    }
     s.meterRefreshHz = nearestOf(s.meterRefreshHz, {30, 60}, 30);
     s.presetFolder = s.presetFolder.trim();
     if (!s.startup.isValid())
@@ -128,7 +135,7 @@ void SettingsManager::readFromProperties()
     s.style = ui::styleFromId(p.getValue(kTheme, "studioDark"));
     s.layout = p.getValue(kLayout, "full") == "compact" ? ui::Layout::compact : ui::Layout::full;
     s.tooltips = p.getBoolValue(kTooltips, s.tooltips);
-    s.doubleClick = p.getValue(kDblClick, "reset") == "type" ? ui::DoubleClick::type : ui::DoubleClick::reset;
+    s.valueStepDb = static_cast<float>(p.getDoubleValue(kValueStep, 0.0));
     s.knobMode =
         p.getValue(kKnobDrag, "vertical") == "circular" ? ui::KnobMode::circular : ui::KnobMode::vertical;
     s.sensitivity = static_cast<float>(p.getDoubleValue(kKnobSens, s.sensitivity));
@@ -157,7 +164,7 @@ void SettingsManager::writeToProperties()
     p.setValue(kTheme, ui::styleId(s.style));
     p.setValue(kLayout, s.layout == ui::Layout::compact ? "compact" : "full");
     p.setValue(kTooltips, s.tooltips);
-    p.setValue(kDblClick, s.doubleClick == ui::DoubleClick::type ? "type" : "reset");
+    p.setValue(kValueStep, static_cast<double>(s.valueStepDb));
     p.setValue(kKnobDrag, s.knobMode == ui::KnobMode::circular ? "circular" : "vertical");
     p.setValue(kKnobSens, static_cast<double>(s.sensitivity));
     p.setValue(kMeterHold, s.meterHoldMs);
@@ -215,7 +222,7 @@ bool SettingsManager::reloadIfChanged()
     readFromProperties();
     const bool differs = before.zoomPercent != data_.zoomPercent || before.style != data_.style ||
                          before.layout != data_.layout || before.tooltips != data_.tooltips ||
-                         before.doubleClick != data_.doubleClick || before.knobMode != data_.knobMode ||
+                         before.valueStepDb != data_.valueStepDb || before.knobMode != data_.knobMode ||
                          before.sensitivity != data_.sensitivity || before.meterHoldMs != data_.meterHoldMs ||
                          before.meterRelease != data_.meterRelease ||
                          before.meterRefreshHz != data_.meterRefreshHz || before.showCpu != data_.showCpu ||
@@ -233,7 +240,7 @@ ui::UiOptions SettingsManager::toUiOptions(const UserSettings& s)
     o.style = s.style;
     o.layout = s.layout;
     o.tooltips = s.tooltips;
-    o.dc = s.doubleClick;
+    o.valueStepDb = s.valueStepDb;
     o.knob = s.knobMode;
     o.sensitivity = s.sensitivity;
     o.meterHoldSec =

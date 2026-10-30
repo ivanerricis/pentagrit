@@ -7,7 +7,7 @@ namespace pentagrit::ui
 {
 const char* Footer::defaultHint()
 {
-    return "Drag a knob. Shift for fine, double-click to reset or type a value (see Settings).";
+    return "Drag a knob. Shift for fine, double-click to type a value, Ctrl+click to reset.";
 }
 
 void Footer::setHint(const juce::String& text)

@@ -36,8 +36,8 @@ struct UserSettings
     ui::Style style = ui::Style::studioDark;
     ui::Layout layout = ui::Layout::full;
     bool tooltips = true;
-    ui::DoubleClick doubleClick = ui::DoubleClick::reset;
     ui::KnobMode knobMode = ui::KnobMode::vertical;
+    float valueStepDb = 0.0f;   // dB knobs drag step: 0 (continuous) / 0.1 / 0.5 / 1
     float sensitivity = 0.5f;   // 0 (fine) .. 1 (fast)
     int meterHoldMs = 1000;     // 0 = off, 99999 = infinite
     float meterRelease = 20.0f; // dB/s, 5..60

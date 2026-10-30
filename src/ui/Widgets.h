@@ -16,17 +16,32 @@ inline const Palette& pal(const juce::Component& c)
     return PentagritLookAndFeel::paletteFor(c);
 }
 
-// Slider with "type a value" double-click mode and 2 % wheel steps
+// Rounds v to the nearest multiple of step; step <= 0 means continuous (v unchanged).
+inline double quantiseToStep(double v, double step)
+{
+    return step > 0.0 ? std::round(v / step) * step : v;
+}
+
+// Slider with double-click to type a value, Ctrl/Cmd+click to reset, optional drag step and 2 % wheel steps
 class KnobSlider final : public juce::Slider
 {
 public:
     KnobSlider();
 
     std::function<void()> onTypeRequest;
-    bool typeOnDoubleClick = false;
+    double dragStep = 0.0; // 0 = continuous; Shift (fine adjustment) ignores it
 
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+
+protected:
+    double snapValue(double attempted, DragMode) override;
+
+private:
+    bool resetClick_ = false;
 };
 
 // Knob with label above and value below
@@ -47,8 +62,14 @@ public:
 
     void setColour(juce::Colour c);
     void applyOptions(const UiOptions& o);
-    juce::Slider& slider() noexcept { return slider_; }
+    KnobSlider& slider() noexcept { return slider_; }
     juce::String valueText() const { return valueText_; }
+    // Applies typed text as a value (clamped to the range, never rounded to the value step).
+    void commitText(const juce::String& text);
+    static bool isDbFormat(Fmt f) noexcept
+    {
+        return f == Fmt::dbSigned || f == Fmt::dbUnit || f == Fmt::dbSignedUnit;
+    }
 
     void resized() override;
     void paint(juce::Graphics&) override;

@@ -30,7 +30,14 @@ public:
     void mouseUp(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
 
+    // Sets handle h (0..3) to hz (clamped to the legal spacing) as one complete gesture; resetHandle uses the
+    // default.
+    void commitHz(int h, float hz);
+    void resetHandle(int h);
+
 private:
+    void beginTyping(int h);
+    void endTyping(bool commit);
     int handleAt(float x) const;
     float shownHz(int i) const;
 
@@ -42,5 +49,7 @@ private:
     std::array<float, kMaxBands> peak_{}, tg_{};
     int numBands_ = 3;
     int hover_ = -1, dragging_ = -1;
+    int typingHandle_ = -1;
+    std::unique_ptr<juce::TextEditor> editor_;
 };
 } // namespace pentagrit::ui
