@@ -123,14 +123,22 @@ void TopBar::drawLogoMark(juce::Graphics& g, juce::Rectangle<float> area, const 
 void TopBar::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
-    g.setColour(p.bg1);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+    fillPanel(g, getLocalBounds().toFloat(), p);
 
     drawLogoMark(
         g, juce::Rectangle<float>(10.0f, static_cast<float>(getHeight()) * 0.5f - 15.0f, 32.0f, 30.0f), p);
     g.setColour(p.ink);
-    g.setFont(fonts::sans(13.0f, fonts::Weight::semiBold, 0.14f));
-    g.drawText("PENTAGRIT", 54, 0, 100, getHeight(), juce::Justification::centredLeft, false);
+    // Wide display faces (Fraunces, Chakra Petch) are scaled down to fit the 104 px slot before the preset
+    // bar.
+    constexpr float kWordmarkW = 104.0f;
+    auto wordmark = fonts::display(13.0f, fonts::Weight::semiBold, 0.14f);
+    juce::GlyphArrangement ga;
+    ga.addLineOfText(wordmark, "PENTAGRIT", 0.0f, 0.0f);
+    const float textW = ga.getBoundingBox(0, -1, true).getWidth();
+    if (textW > kWordmarkW)
+        wordmark = fonts::display(13.0f * kWordmarkW / textW, fonts::Weight::semiBold, 0.14f);
+    g.setFont(wordmark);
+    g.drawText("PENTAGRIT", 54, 0, 106, getHeight(), juce::Justification::centredLeft, false);
 
     g.setColour(p.ink3);
     g.setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));

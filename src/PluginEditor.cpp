@@ -117,14 +117,14 @@ void PentagritAudioProcessorEditor::updateConstraints()
 void PentagritAudioProcessorEditor::setUiOptions(const UiOptions& o)
 {
     const bool layoutChanged = o.layout != options_.layout;
-    const bool themeChanged = o.theme != lnf_.theme();
+    const bool styleChanged = o.style != lnf_.style();
     options_ = o;
     options_.refreshHz = juce::jlimit(10, 120, o.refreshHz);
     options_.zoomPercent = juce::jlimit(50, 400, o.zoomPercent);
 
-    if (themeChanged)
+    if (styleChanged)
     {
-        lnf_.setTheme(o.theme);
+        lnf_.setStyle(o.style);
         if (tooltip_ != nullptr)
             tooltip_->sendLookAndFeelChange();
         sendLookAndFeelChange();

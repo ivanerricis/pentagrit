@@ -317,7 +317,7 @@ void SegmentedSelector::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
     g.setColour(p.bg0);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 4.0f);
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), p.rButton);
     const auto inner = getLocalBounds().toFloat().reduced(2.0f);
     const float w = inner.getWidth() / static_cast<float>(labels_.size());
     for (int i = 0; i < labels_.size(); ++i)
@@ -327,10 +327,10 @@ void SegmentedSelector::paint(juce::Graphics& g)
         const bool on = i == selected_;
         if (on)
         {
-            g.setColour(p.ink);
-            g.fillRoundedRectangle(r.reduced(0.5f, 0.0f), 3.0f);
+            g.setColour(p.act);
+            g.fillRoundedRectangle(r.reduced(0.5f, 0.0f), p.rSmall);
         }
-        g.setColour(on ? p.bg0 : p.ink2);
+        g.setColour(on ? p.onAct : p.ink2);
         g.setFont(fonts::sans(11.5f, on ? fonts::Weight::semiBold : fonts::Weight::medium));
         g.drawText(labels_[i], r.toNearestInt(), juce::Justification::centred, false);
     }

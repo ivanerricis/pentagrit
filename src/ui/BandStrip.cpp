@@ -30,7 +30,7 @@ void BandStrip::Inner::paint(juce::Graphics& g)
     const auto& p = pal(*this);
     g.setColour(p.bg0);
     for (const auto& r : sections)
-        g.fillRoundedRectangle(r.toFloat(), 4.0f);
+        g.fillRoundedRectangle(r.toFloat(), p.rWell);
 }
 
 BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& meters, int bandIndex)
@@ -126,6 +126,10 @@ void BandStrip::applyTheme()
     const auto c = p.band[static_cast<size_t>(index_)];
     for (auto* k : knobs_)
         k->setColour(c);
+    for (auto* l : {&from_, &to_})
+        l->setFont(fonts::mono(10.5f, fonts::Weight::regular));
+    for (auto* l : {&fromCaption_, &toCaption_})
+        l->setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));
     curve_.setBandColour(c);
     transient_.setBandColour(c);
     meter_.setBarColour(c);
@@ -297,13 +301,12 @@ void BandStrip::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
     const auto c = p.band[static_cast<size_t>(index_)];
-    g.setColour(p.bg1);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+    fillPanel(g, getLocalBounds().toFloat(), p);
     g.setColour(c);
     g.fillRoundedRectangle(0.0f, 10.0f, 3.0f, static_cast<float>(getHeight() - 20), 1.5f);
 
     g.setColour(c);
-    g.setFont(fonts::sans(12.5f, fonts::Weight::semiBold));
+    g.setFont(fonts::display(12.5f, fonts::Weight::semiBold));
     g.drawText("B" + juce::String(index_ + 1), 11, 8, 40, 20, juce::Justification::centredLeft, false);
 }
 } // namespace pentagrit::ui

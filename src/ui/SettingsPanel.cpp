@@ -176,6 +176,21 @@ public:
     Styled<juce::TextEditor> edit;
     juce::TextButton choose{"Choose..."}, open{"Open folder"};
 };
+
+// Drop-down of the visual styles (six options are too many for a segmented control).
+class StyleSelector final : public juce::ComboBox
+{
+public:
+    StyleSelector(const juce::StringArray& names, int selected, std::function<void(int)> onChange)
+    {
+        for (int i = 0; i < names.size(); ++i)
+            addItem(names[i], i + 1);
+        setSelectedItemIndex(selected, juce::dontSendNotification);
+        setTitle("Style");
+        setTooltip("Visual style of the plug-in window");
+        ComboBox::onChange = [this, cb = std::move(onChange)] { cb(getSelectedItemIndex()); };
+    }
+};
 } // namespace
 
 // ================================================================================================ widgets
@@ -226,7 +241,7 @@ public:
     {
         const auto& p = pal(*this);
         g.setColour(p.bg0);
-        g.fillRoundedRectangle(getLocalBounds().toFloat(), 4.0f);
+        g.fillRoundedRectangle(getLocalBounds().toFloat(), p.rButton);
         const auto inner = getLocalBounds().toFloat().reduced(2.0f);
         const float w = inner.getWidth() / static_cast<float>(labels_.size());
         for (int i = 0; i < labels_.size(); ++i)
@@ -236,10 +251,10 @@ public:
             const bool on = i == selected_;
             if (on)
             {
-                g.setColour(p.ink);
-                g.fillRoundedRectangle(r.reduced(0.5f, 0.0f), 3.0f);
+                g.setColour(p.act);
+                g.fillRoundedRectangle(r.reduced(0.5f, 0.0f), p.rSmall);
             }
-            g.setColour(on ? p.bg0 : p.ink2);
+            g.setColour(on ? p.onAct : p.ink2);
             g.setFont(fonts::sans(11.5f, on ? fonts::Weight::semiBold : fonts::Weight::medium));
             g.drawText(labels_[i], r.toNearestInt(), juce::Justification::centred, false);
         }
@@ -289,7 +304,7 @@ public:
         g.setColour(on_ ? p.band[3] : p.bg3);
         g.fillRoundedRectangle(r, 11.0f);
         const float cx = on_ ? r.getRight() - 11.0f : r.getX() + 11.0f;
-        g.setColour(on_ ? p.bg0 : p.ink3);
+        g.setColour(on_ ? p.onBand : p.ink3);
         g.fillEllipse(juce::Rectangle<float>(16.0f, 16.0f).withCentre({cx, r.getCentreY()}));
         if (hasKeyboardFocus(true))
         {
@@ -343,7 +358,13 @@ public:
     {
         const auto& p = pal(*this);
         g.setColour(p.bg2);
-        g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+        g.fillRoundedRectangle(getLocalBounds().toFloat(), p.rPanel);
+        if (p.panelBorderW > 0.0f)
+        {
+            g.setColour(p.bg3);
+            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(p.panelBorderW * 0.5f), p.rPanel,
+                                   p.panelBorderW);
+        }
 
         const int top = extra_ != nullptr ? kRowH : getHeight();
         auto left = juce::Rectangle<int>(14, 0, getWidth() - 28 - controlW_ - 16, top).reduced(0, 7);
@@ -642,10 +663,16 @@ void SettingsPanel::buildInterface(Page& page)
            seg({"75%", "100%", "125%", "150%", "200%"}, indexOf({75, 100, 125, 150, 200}, s.zoomPercent, 1),
                [this](int i) { apply([i](UserSettings& u) { u.zoomPercent = zooms[i]; }); }),
            300);
-    addRow("Theme", {},
-           seg({"Dark", "Light"}, s.theme == Theme::dark ? 0 : 1, [this](int i)
-               { apply([i](UserSettings& u) { u.theme = i == 0 ? Theme::dark : Theme::light; }); }),
-           170, 44);
+    {
+        juce::StringArray names;
+        for (int i = 0; i < kNumStyles; ++i)
+            names.add(styleName(static_cast<Style>(i)));
+        addRow("Style", "Colour scheme and shapes of the whole window.",
+               std::make_unique<StyleSelector>(
+                   names, static_cast<int>(s.style),
+                   [this](int i) { apply([i](UserSettings& u) { u.style = static_cast<Style>(i); }); }),
+               190, 44);
+    }
     addRow("Layout",
            "Full: crossover display plus strips (1100 x 680). Compact: no display, crossovers typed in each "
            "strip "

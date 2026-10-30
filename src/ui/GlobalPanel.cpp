@@ -77,8 +77,7 @@ void GlobalPanel::resized()
 void GlobalPanel::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
-    g.setColour(p.bg1);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+    fillPanel(g, getLocalBounds().toFloat(), p);
     g.setColour(p.ink3);
     g.setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));
     g.drawText("MASTER", 12, 8, getWidth() - 24, 16, juce::Justification::centredLeft, false);
@@ -86,7 +85,7 @@ void GlobalPanel::paint(juce::Graphics& g)
     // Auto-gain readout bar at the bottom.
     auto r = getLocalBounds().reduced(8).removeFromBottom(26).toFloat();
     g.setColour(p.bg0);
-    g.fillRoundedRectangle(r, 4.0f);
+    g.fillRoundedRectangle(r, p.rWell);
     g.setColour(p.ink3);
     g.setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));
     g.drawText("AUTO-GAIN", r.reduced(8, 0).toNearestInt(), juce::Justification::centredLeft, false);

@@ -125,7 +125,7 @@ void SettingsManager::readFromProperties()
     UserSettings s;
     auto& p = *props_;
     s.zoomPercent = p.getIntValue(kZoom, s.zoomPercent);
-    s.theme = p.getValue(kTheme, "dark") == "light" ? ui::Theme::light : ui::Theme::dark;
+    s.style = ui::styleFromId(p.getValue(kTheme, "studioDark"));
     s.layout = p.getValue(kLayout, "full") == "compact" ? ui::Layout::compact : ui::Layout::full;
     s.tooltips = p.getBoolValue(kTooltips, s.tooltips);
     s.doubleClick = p.getValue(kDblClick, "reset") == "type" ? ui::DoubleClick::type : ui::DoubleClick::reset;
@@ -154,7 +154,7 @@ void SettingsManager::writeToProperties()
     auto& p = *props_;
     const auto& s = data_;
     p.setValue(kZoom, s.zoomPercent);
-    p.setValue(kTheme, s.theme == ui::Theme::light ? "light" : "dark");
+    p.setValue(kTheme, ui::styleId(s.style));
     p.setValue(kLayout, s.layout == ui::Layout::compact ? "compact" : "full");
     p.setValue(kTooltips, s.tooltips);
     p.setValue(kDblClick, s.doubleClick == ui::DoubleClick::type ? "type" : "reset");
@@ -213,7 +213,7 @@ bool SettingsManager::reloadIfChanged()
     const auto before = data_;
     props_->reload();
     readFromProperties();
-    const bool differs = before.zoomPercent != data_.zoomPercent || before.theme != data_.theme ||
+    const bool differs = before.zoomPercent != data_.zoomPercent || before.style != data_.style ||
                          before.layout != data_.layout || before.tooltips != data_.tooltips ||
                          before.doubleClick != data_.doubleClick || before.knobMode != data_.knobMode ||
                          before.sensitivity != data_.sensitivity || before.meterHoldMs != data_.meterHoldMs ||
@@ -230,7 +230,7 @@ bool SettingsManager::reloadIfChanged()
 ui::UiOptions SettingsManager::toUiOptions(const UserSettings& s)
 {
     ui::UiOptions o;
-    o.theme = s.theme;
+    o.style = s.style;
     o.layout = s.layout;
     o.tooltips = s.tooltips;
     o.dc = s.doubleClick;
