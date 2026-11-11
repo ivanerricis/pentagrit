@@ -16,7 +16,9 @@ void BandProcessor::prepare(double procRate, int maxBlock, int numCh, int maxDel
     detector_.setSize(std::max(numCh, 1), static_cast<int>(n), false, true, false);
     int ringSize = 64;
     while (ringSize < std::max(maxDelaySamples, 0) + 2)
+    {
         ringSize <<= 1;
+    }
     delayLine_.setSize(std::max(numCh, 1), ringSize, false, true, false);
     delayMask_ = ringSize - 1;
     delay_ = 0;
@@ -87,7 +89,9 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
     const int n = static_cast<int>(blockIn.getNumSamples());
     const int nc = std::min(static_cast<int>(blockIn.getNumChannels()), dry_.getNumChannels());
     if (n == 0 || nc == 0 || n > dry_.getNumSamples())
+    {
         return;
+    }
     auto block = blockIn.getSubsetChannelBlock(0, static_cast<size_t>(nc));
 
     // Lookahead: keep an undelayed copy for the detector, then delay the audio in place. This runs before the
@@ -128,15 +132,23 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
         cold_ = false;
         const bool mixConst1 = !wetMix_.isSmoothing() && wetMix_.getTargetValue() >= 1.0f;
         if (!mixConst1)
+        {
             for (int ch = 0; ch < nc; ++ch)
+            {
                 juce::FloatVectorOperations::copy(dry_.getWritePointer(ch),
                                                   block.getChannelPointer(static_cast<size_t>(ch)), n);
+            }
+        }
 
         if (lookahead)
+        {
             transient_.process(
                 juce::dsp::AudioBlock<const float>(detector_).getSubBlock(0, static_cast<size_t>(n)), block);
+        }
         else
+        {
             transient_.process(block);
+        }
         saturator_.process(block);
 
         if (!mixConst1)
@@ -144,18 +156,30 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
             const bool smoothing = wetMix_.isSmoothing();
             const float mConst = wetMix_.getTargetValue();
             if (smoothing)
+            {
                 for (int i = 0; i < n; ++i)
+                {
                     mixRamp_[static_cast<size_t>(i)] = wetMix_.getNextValue();
+                }
+            }
             for (int ch = 0; ch < nc; ++ch)
             {
                 float* w = block.getChannelPointer(static_cast<size_t>(ch));
                 const float* d = dry_.getReadPointer(ch);
                 if (smoothing)
+                {
                     for (int i = 0; i < n; ++i)
+                    {
                         w[i] = d[i] + (w[i] - d[i]) * mixRamp_[static_cast<size_t>(i)];
+                    }
+                }
                 else
+                {
                     for (int i = 0; i < n; ++i)
+                    {
                         w[i] = d[i] + (w[i] - d[i]) * mConst;
+                    }
+                }
             }
         }
     }
@@ -164,20 +188,28 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
     if (gain_.isSmoothing())
     {
         for (int i = 0; i < n; ++i)
+        {
             gainRamp_[static_cast<size_t>(i)] = gain_.getNextValue();
+        }
         for (int ch = 0; ch < nc; ++ch)
         {
             float* d = block.getChannelPointer(static_cast<size_t>(ch));
             for (int i = 0; i < n; ++i)
+            {
                 d[i] *= gainRamp_[static_cast<size_t>(i)];
+            }
         }
     }
     else
     {
         const float g = gain_.getTargetValue();
         if (g != 1.0f)
+        {
             for (int ch = 0; ch < nc; ++ch)
+            {
                 juce::FloatVectorOperations::multiply(block.getChannelPointer(static_cast<size_t>(ch)), g, n);
+            }
+        }
     }
 }
 

@@ -114,10 +114,14 @@ public:
     {
         const juce::SpinLock::ScopedLockType lock(lockObject());
         if (instance == nullptr)
+        {
             instance = new FontCache();
+        }
         auto& slot = instance->faces[style];
         if (slot == nullptr)
+        {
             slot = std::make_shared<const Faces>(static_cast<Style>(style));
+        }
         return slot;
     }
 
@@ -128,7 +132,9 @@ private:
     {
         const juce::SpinLock::ScopedLockType lock(lockObject());
         if (instance == this)
+        {
             instance = nullptr;
+        }
     }
 
     // Function-local static with a trivial destructor, safe to use during teardown.
@@ -156,7 +162,9 @@ juce::Font make(const juce::Typeface::Ptr& face, const juce::String& fallbackFam
     opts = opts.withPointHeight(px);
     juce::Font f(opts);
     if (tracking != 0.0f)
+    {
         f.setExtraKerningFactor(tracking);
+    }
     return f;
 }
 } // namespace

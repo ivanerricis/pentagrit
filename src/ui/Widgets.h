@@ -218,7 +218,9 @@ public:
     void resized() override
     {
         for (auto* c : getChildren())
+        {
             c->setBounds(getLocalBounds());
+        }
     }
 };
 

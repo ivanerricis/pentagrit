@@ -20,7 +20,9 @@ bool isAllDigits(const juce::String& s)
 bool parseNumber(const juce::String& s, int& out)
 {
     if (!isAllDigits(s) || s.length() > 9 || (s.length() > 1 && s[0] == '0'))
+    {
         return false;
+    }
     out = s.getIntValue();
     return true;
 }
@@ -34,7 +36,9 @@ int compareIdentifiers(const juce::String& a, const juce::String& b)
         return x == y ? 0 : (x < y ? -1 : 1);
     }
     if (na != nb)
+    {
         return na ? -1 : 1; // numeric identifiers have lower precedence
+    }
     const int c = a.compare(b);
     return c == 0 ? 0 : (c < 0 ? -1 : 1);
 }
@@ -44,9 +48,13 @@ std::optional<Version> parseVersion(const juce::String& text)
 {
     auto t = text.trim();
     if (t.startsWithChar('v') || t.startsWithChar('V'))
+    {
         t = t.substring(1);
+    }
     if (t.isEmpty() || t.length() > 64)
+    {
         return std::nullopt;
+    }
 
     const auto plus = t.indexOfChar('+');
     if (plus >= 0)
@@ -54,7 +62,9 @@ std::optional<Version> parseVersion(const juce::String& text)
         const auto build = t.substring(plus + 1);
         if (build.isEmpty() || !(juce::String(kAlnumDash) + ".").containsChar(build[0]) ||
             !build.containsOnly(juce::String(kAlnumDash) + "."))
+        {
             return std::nullopt;
+        }
         t = t.substring(0, plus);
     }
 
@@ -69,25 +79,37 @@ std::optional<Version> parseVersion(const juce::String& text)
     }
 
     if (core.startsWithChar('.') || core.endsWithChar('.'))
+    {
         return std::nullopt;
+    }
     const auto parts = juce::StringArray::fromTokens(core, ".", "");
     if (parts.size() != 3)
+    {
         return std::nullopt;
+    }
     Version v;
     if (!parseNumber(parts[0], v.major) || !parseNumber(parts[1], v.minor) || !parseNumber(parts[2], v.patch))
+    {
         return std::nullopt;
+    }
 
     if (hasPre)
     {
         if (pre.isEmpty() || pre.startsWithChar('.') || pre.endsWithChar('.') || pre.contains(".."))
+        {
             return std::nullopt;
+        }
         v.pre = juce::StringArray::fromTokens(pre, ".", "");
         for (const auto& id : v.pre)
         {
             if (id.isEmpty() || !id.containsOnly(kAlnumDash))
+            {
                 return std::nullopt;
+            }
             if (isAllDigits(id) && id.length() > 1 && id[0] == '0')
+            {
                 return std::nullopt; // numeric identifiers have no leading zeros
+            }
         }
     }
     return v;
@@ -96,19 +118,33 @@ std::optional<Version> parseVersion(const juce::String& text)
 int compareVersions(const Version& a, const Version& b)
 {
     if (a.major != b.major)
+    {
         return a.major < b.major ? -1 : 1;
+    }
     if (a.minor != b.minor)
+    {
         return a.minor < b.minor ? -1 : 1;
+    }
     if (a.patch != b.patch)
+    {
         return a.patch < b.patch ? -1 : 1;
+    }
     if (a.pre.isEmpty() != b.pre.isEmpty())
+    {
         return a.pre.isEmpty() ? 1 : -1; // a release is higher than any of its pre-releases
+    }
     const int n = juce::jmin(a.pre.size(), b.pre.size());
     for (int i = 0; i < n; ++i)
+    {
         if (const int c = compareIdentifiers(a.pre[i], b.pre[i]); c != 0)
+        {
             return c;
+        }
+    }
     if (a.pre.size() == b.pre.size())
+    {
         return 0;
+    }
     return a.pre.size() < b.pre.size() ? -1 : 1;
 }
 
@@ -117,21 +153,31 @@ std::optional<ReleaseInfo> parseLatestRelease(const juce::String& json, juce::St
     auto fail = [error](const char* why) -> std::optional<ReleaseInfo>
     {
         if (error != nullptr)
+        {
             *error = why;
+        }
         return std::nullopt;
     };
     juce::var root;
     if (json.isEmpty() || !juce::JSON::parse(json, root).wasOk() || !root.isObject())
+    {
         return fail("Unexpected response from GitHub");
+    }
     const auto tagVar = root.getProperty("tag_name", {});
     const auto urlVar = root.getProperty("html_url", {});
     if (!tagVar.isString() || !urlVar.isString())
+    {
         return fail("The response has no release information");
+    }
     ReleaseInfo r{tagVar.toString().trim(), urlVar.toString().trim()};
     if (!parseVersion(r.tag).has_value())
+    {
         return fail("The latest release has an unrecognised version");
+    }
     if (!r.url.startsWith(kReleaseUrlPrefix))
+    {
         return fail("The release link is not a Pentagrit GitHub page");
+    }
     return r;
 }
 
@@ -150,22 +196,34 @@ UpdateResult evaluate(const FetchOutcome& response, const juce::String& currentV
         return out;
     };
     if (!response.ok)
+    {
         return fail(response.error.isNotEmpty() ? response.error : juce::String("Could not reach GitHub"));
+    }
     if (response.status == 404)
+    {
         return fail("No release has been published yet");
+    }
     if (response.status == 403 || response.status == 429)
+    {
         return fail("GitHub is limiting requests, try again later");
+    }
     if (response.status < 200 || response.status >= 300)
+    {
         return fail("GitHub answered with HTTP " + juce::String(response.status));
+    }
 
     juce::String why;
     const auto release = parseLatestRelease(response.body, &why);
     if (!release)
+    {
         return fail(why);
+    }
     const auto latest = parseVersion(release->tag);
     const auto current = parseVersion(currentVersion);
     if (!latest || !current)
+    {
         return fail("Unrecognised version");
+    }
 
     out.version = release->tag.trim().trimCharactersAtStart("vV");
     if (compareVersions(*latest, *current) > 0)
@@ -211,7 +269,9 @@ FetchOutcome fetchLatestRelease()
         }
         const int n = stream->read(buffer, static_cast<int>(sizeof(buffer)));
         if (n <= 0)
+        {
             break;
+        }
         data.append(buffer, static_cast<size_t>(n));
     }
     out.ok = true;
@@ -247,9 +307,13 @@ void postToMessageThread(std::function<void()> fn)
         p = posterOverride();
     }
     if (p)
+    {
         p(std::move(fn));
+    }
     else
+    {
         juce::MessageManager::callAsync(std::move(fn));
+    }
 }
 } // namespace
 
@@ -275,9 +339,13 @@ public:
         try
         {
             if (fetch_)
+            {
                 response = fetch_();
+            }
             else
+            {
                 response.error = "No update source";
+            }
         }
         catch (...)
         {
@@ -286,12 +354,16 @@ public:
         }
         auto result = evaluate(response, version_);
         if (threadShouldExit())
+        {
             return;
+        }
         postToMessageThread(
             [owner = owner_, result = std::move(result), cb = std::move(callback_)]
             {
                 if (owner != nullptr)
+                {
                     owner->finish(result, cb);
+                }
             });
     }
 
@@ -308,7 +380,9 @@ UpdateChecker::~UpdateChecker()
 {
     masterReference.clear(); // pending message-thread callbacks become no-ops
     if (worker_ != nullptr)
+    {
         worker_->stopThread(kTimeoutMs + 4000);
+    }
     worker_.reset();
 }
 
@@ -322,9 +396,13 @@ bool UpdateChecker::check(const juce::String& currentVersion,
                           std::function<void(const UpdateResult&)> onResult)
 {
     if (busy_.exchange(true))
+    {
         return false;
+    }
     if (worker_ != nullptr)
+    {
         worker_->stopThread(kTimeoutMs + 4000); // already finished: only waits for the thread to exit
+    }
     worker_.reset();
     worker_ = std::make_unique<Worker>(fetcher_, currentVersion, this, std::move(onResult));
     worker_->startThread();
@@ -335,6 +413,8 @@ void UpdateChecker::finish(const UpdateResult& r, const std::function<void(const
 {
     busy_.store(false);
     if (cb)
+    {
         cb(r);
+    }
 }
 } // namespace pentagrit::update

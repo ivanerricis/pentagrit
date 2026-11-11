@@ -13,12 +13,18 @@ struct MeterState
     MeterState() noexcept
     {
         for (auto& v : bandPeakDb)
+        {
             v.store(-100.0f, std::memory_order_relaxed);
+        }
         for (auto& v : bandTransientGainDb)
+        {
             v.store(0.0f, std::memory_order_relaxed);
+        }
         constexpr std::array<float, 4> defaults{120.0f, 1200.0f, 3500.0f, 8000.0f};
         for (size_t i = 0; i < defaults.size(); ++i)
+        {
             effectiveXoverHz[i].store(defaults[i], std::memory_order_relaxed);
+        }
     }
 
     std::array<std::atomic<float>, kMaxBands> bandPeakDb, bandTransientGainDb;

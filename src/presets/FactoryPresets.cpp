@@ -32,7 +32,9 @@ std::vector<FactoryPreset> loadFactoryPresets()
         const char* data = PentagritPresetData::getNamedResource(resName, size);
         const juce::String fileName = PentagritPresetData::getNamedResourceOriginalFilename(resName);
         if (data == nullptr || !fileName.endsWithIgnoreCase(".xml"))
+        {
             continue;
+        }
 
         auto xml = juce::XmlDocument::parse(juce::String::fromUTF8(data, size));
         Item item;
@@ -46,7 +48,9 @@ std::vector<FactoryPreset> loadFactoryPresets()
         }
         item.preset.entry.factory = true;
         if (item.preset.entry.category.isEmpty())
+        {
             item.preset.entry.category = PresetManager::kUnsortedCategory;
+        }
         items.push_back(std::move(item));
     }
 
@@ -56,16 +60,22 @@ std::vector<FactoryPreset> loadFactoryPresets()
                          const int ra = categoryRank(a.preset.entry.category);
                          const int rb = categoryRank(b.preset.entry.category);
                          if (ra != rb)
+                         {
                              return ra < rb;
+                         }
                          if (ra == 5 && a.preset.entry.category != b.preset.entry.category)
+                         {
                              return a.preset.entry.category < b.preset.entry.category;
+                         }
                          return a.fileName < b.fileName;
                      });
 
     std::vector<FactoryPreset> out;
     out.reserve(items.size());
     for (auto& i : items)
+    {
         out.push_back(std::move(i.preset));
+    }
     return out;
 }
 } // namespace pentagrit

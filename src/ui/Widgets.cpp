@@ -45,34 +45,46 @@ void KnobSlider::mouseDown(const juce::MouseEvent& e)
 void KnobSlider::mouseDrag(const juce::MouseEvent& e)
 {
     if (!resetClick_)
+    {
         juce::Slider::mouseDrag(e);
+    }
 }
 
 void KnobSlider::mouseUp(const juce::MouseEvent& e)
 {
     if (resetClick_)
+    {
         resetClick_ = false;
+    }
     else
+    {
         juce::Slider::mouseUp(e);
+    }
 }
 
 void KnobSlider::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if (e.mods.isLeftButtonDown() && !e.mods.isCommandDown() && onTypeRequest)
+    {
         onTypeRequest();
+    }
 }
 
 double KnobSlider::snapValue(double attempted, DragMode)
 {
     if (dragStep <= 0.0 || juce::ModifierKeys::currentModifiers.isShiftDown())
+    {
         return attempted;
+    }
     return juce::jlimit(getMinimum(), getMaximum(), quantiseToStep(attempted, dragStep));
 }
 
 void KnobSlider::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& w)
 {
     if (!isEnabled() || w.deltaY == 0.0f)
+    {
         return;
+    }
     const double dir = (w.deltaY > 0.0f ? 1.0 : -1.0) * (w.isReversed ? -1.0 : 1.0);
     const double p = juce::jlimit(0.0, 1.0, valueToProportionOfLength(getValue()) + dir * 0.02);
     // One gesture (and so one undo step) per wheel notch.
@@ -170,7 +182,9 @@ double LabelledKnob::parse(const juce::String& text) const
 void LabelledKnob::beginTyping()
 {
     if (editor_ != nullptr)
+    {
         return;
+    }
     editor_ = std::make_unique<juce::TextEditor>();
     editor_->setTitle(label_);
     editor_->setJustification(juce::Justification::centred);
@@ -198,11 +212,15 @@ void LabelledKnob::commitText(const juce::String& text)
 void LabelledKnob::endTyping(bool commit)
 {
     if (editor_ == nullptr)
+    {
         return;
+    }
     auto ed = std::move(editor_);
     ed->onFocusLost = nullptr;
     if (commit)
+    {
         commitText(ed->getText());
+    }
     removeChildComponent(ed.get());
     // Destroy asynchronously: this can be called from the editor's own callback.
     juce::MessageManager::callAsync([keep = std::shared_ptr<juce::TextEditor>(std::move(ed))] {});
@@ -216,7 +234,9 @@ void LabelledKnob::resized()
     auto kb = b.removeFromTop(knobSize_ + 2);
     slider_.setBounds(kb.withSizeKeepingCentre(knobSize_, knobSize_));
     if (editor_ != nullptr)
+    {
         editor_->setBounds(getLocalBounds().removeFromBottom(14).reduced(2, 0));
+    }
 }
 
 juce::Font LabelledKnob::captionFont() const
@@ -287,10 +307,14 @@ void LevelMeter::update(float peakDb, float dt)
     {
         holdAge_ += dt;
         if (holdSec_ > 0.0f && holdAge_ > holdSec_)
+        {
             holdDb_ = juce::jmax(levelDb_, holdDb_ - releaseDbPerSec_ * dt);
+        }
     }
     if (std::abs(levelDb_ - prevLevel) > 0.05f || std::abs(holdDb_ - prevHold) > 0.05f)
+    {
         repaint();
+    }
 }
 
 void LevelMeter::paint(juce::Graphics& g)
@@ -363,7 +387,9 @@ void SegmentedSelector::mouseDown(const juce::MouseEvent& e)
 {
     const int i = indexAt(e.getPosition());
     if (i != selected_)
+    {
         select(i);
+    }
 }
 
 bool SegmentedSelector::keyPressed(const juce::KeyPress& k)
@@ -436,7 +462,9 @@ SatTypeSelector::SatTypeSelector(juce::AudioProcessorValueTreeState& apvts, cons
             type_ = juce::jlimit(0, param_->choices.size() - 1, juce::roundToInt(v));
             name_.setButtonText(param_->choices[type_]);
             if (onTypeChanged)
+            {
                 onTypeChanged(type_);
+            }
         },
         nullptr);
     attachment_->sendInitialUpdate();
@@ -483,7 +511,9 @@ void CurvePreview::rebuild()
     curve_.clear();
     const auto b = getLocalBounds().toFloat().reduced(3.0f);
     if (b.isEmpty())
+    {
         return;
+    }
     const float gain = 1.0f + driveDb_ / 36.0f * 6.0f;
     constexpr int n = 72;
     constexpr float clipY = 1.15f;
@@ -492,14 +522,20 @@ void CurvePreview::rebuild()
         const float x = -1.0f + 2.0f * static_cast<float>(i) / n;
         float y = x;
         if (type_ != 0)
+        {
             y = Saturator::shape(static_cast<SatType>(type_), x * gain);
+        }
         y = juce::jlimit(-clipY, clipY, y);
         const juce::Point<float> pt(b.getX() + (x + 1.0f) * 0.5f * b.getWidth(),
                                     b.getCentreY() - y / clipY * 0.5f * b.getHeight());
         if (i == 0)
+        {
             curve_.startNewSubPath(pt);
+        }
         else
+        {
             curve_.lineTo(pt);
+        }
     }
 }
 
@@ -561,9 +597,15 @@ juce::Range<float> allowedRange(int index, const std::array<float, 4>& hz, int n
 {
     float lo = minFreq * ratio, hi = maxFreq / ratio;
     if (index > 0)
-        lo = hz[static_cast<size_t>(index - 1)] * ratio;
+    {
+        const int prev = index - 1;
+        lo = hz[static_cast<size_t>(prev)] * ratio;
+    }
     if (index + 1 < numBands - 1)
-        hi = hz[static_cast<size_t>(index + 1)] / ratio;
+    {
+        const int next = index + 1;
+        hi = hz[static_cast<size_t>(next)] / ratio;
+    }
     return {lo, juce::jmax(lo, hi)};
 }
 
@@ -577,10 +619,14 @@ bool parseHz(const juce::String& text, float& out)
 {
     const auto t = text.trim().toLowerCase();
     if (!t.containsAnyOf("0123456789"))
+    {
         return false;
+    }
     double v = t.retainCharacters("0123456789.").getDoubleValue();
     if (t.contains("k"))
+    {
         v *= 1000.0;
+    }
     out = static_cast<float>(v);
     return true;
 }
@@ -597,9 +643,13 @@ juce::String formatShort(float hz)
     {
         auto s = juce::String(hz / 1000.0f, 2);
         while (s.endsWithChar('0'))
+        {
             s = s.dropLastCharacters(1);
+        }
         if (s.endsWithChar('.'))
+        {
             s = s.dropLastCharacters(1);
+        }
         return s + "k";
     }
     return juce::String(juce::roundToInt(hz));

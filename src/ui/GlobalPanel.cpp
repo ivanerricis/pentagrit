@@ -13,7 +13,9 @@ GlobalPanel::GlobalPanel(juce::AudioProcessorValueTreeState& apvts, MeterState& 
 {
     setTitle("Master");
     for (auto* c : std::initializer_list<juce::Component*>{&in_, &out_, &mix_, &inMeter_, &outMeter_})
+    {
         addAndMakeVisible(*c);
+    }
     driveComp_.getProperties().set(prop::kind, "pill");
     driveComp_.setTitle("Drive compensation");
     driveComp_.setTooltip(
@@ -33,7 +35,9 @@ void GlobalPanel::applyTheme()
 {
     const auto& p = pal(*this);
     for (auto* k : {&in_, &out_, &mix_})
+    {
         k->setColour(p.ink);
+    }
     inMeter_.setBarColour(p.ink);
     outMeter_.setBarColour(p.ink);
     repaint();
@@ -42,9 +46,13 @@ void GlobalPanel::applyTheme()
 void GlobalPanel::applyOptions(const UiOptions& o)
 {
     for (auto* k : {&in_, &out_, &mix_})
+    {
         k->applyOptions(o);
+    }
     for (auto* m : {&inMeter_, &outMeter_})
+    {
         m->setBallistics(o.meterHoldSec, o.meterReleaseDbPerSec);
+    }
 }
 
 void GlobalPanel::tick(float dt)

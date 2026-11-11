@@ -94,7 +94,9 @@ void CrossoverDisplay::tick()
         }
     }
     if (changed)
+    {
         repaint();
+    }
 }
 
 int CrossoverDisplay::handleAt(float x) const
@@ -136,13 +138,17 @@ void CrossoverDisplay::mouseExit(const juce::MouseEvent&)
 void CrossoverDisplay::mouseDown(const juce::MouseEvent& e)
 {
     if (editor_ != nullptr)
+    {
         endTyping(true);
+    }
     if (e.mods.isLeftButtonDown() && e.mods.isCommandDown())
     {
         // Ctrl+click (Cmd+click on macOS) resets the handle, like on the knobs.
         const int h = handleAt(e.position.x);
         if (h >= 0)
+        {
             resetHandle(h);
+        }
         dragging_ = -1;
         return;
     }
@@ -158,10 +164,14 @@ void CrossoverDisplay::mouseDown(const juce::MouseEvent& e)
 void CrossoverDisplay::mouseDrag(const juce::MouseEvent& e)
 {
     if (dragging_ < 0)
+    {
         return;
+    }
     std::array<float, 4> cur{};
     for (size_t i = 0; i < 4; ++i)
+    {
         cur[i] = apvts_.getRawParameterValue(pid::xover[i])->load();
+    }
     const float hz = xover::clamp(dragging_, xToFreq(e.position.x), cur, numBands_);
     attachments_[static_cast<size_t>(dragging_)]->setValueAsPartOfGesture(hz);
 }
@@ -179,10 +189,14 @@ void CrossoverDisplay::mouseUp(const juce::MouseEvent&)
 void CrossoverDisplay::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if (!e.mods.isLeftButtonDown() || e.mods.isCommandDown())
+    {
         return;
+    }
     const int h = handleAt(e.position.x);
     if (h >= 0)
+    {
         beginTyping(h);
+    }
 }
 
 void CrossoverDisplay::beginTyping(int h)
@@ -209,7 +223,9 @@ void CrossoverDisplay::beginTyping(int h)
 void CrossoverDisplay::endTyping(bool commit)
 {
     if (editor_ == nullptr)
+    {
         return;
+    }
     auto ed = std::move(editor_);
     ed->onFocusLost = nullptr;
     const int h = typingHandle_;
@@ -218,7 +234,9 @@ void CrossoverDisplay::endTyping(bool commit)
     {
         const auto text = ed->getText().retainCharacters("0123456789.");
         if (text.isNotEmpty())
+        {
             commitHz(h, text.getFloatValue());
+        }
     }
     removeChildComponent(ed.get());
     // Destroy asynchronously: this can be called from the editor's own callback.
@@ -230,7 +248,9 @@ void CrossoverDisplay::commitHz(int h, float hz)
 {
     std::array<float, 4> cur{};
     for (size_t i = 0; i < 4; ++i)
+    {
         cur[i] = apvts_.getRawParameterValue(pid::xover[i])->load();
+    }
     attachments_[static_cast<size_t>(h)]->setValueAsCompleteGesture(xover::clamp(h, hz, cur, numBands_));
 }
 
@@ -276,7 +296,9 @@ void CrossoverDisplay::paint(juce::Graphics& g)
     float edges[kMaxBands + 1];
     edges[0] = xover::minFreq;
     for (int i = 0; i < numBands_ - 1; ++i)
+    {
         edges[i + 1] = shownHz(i);
+    }
     edges[numBands_] = xover::maxFreq;
 
     for (int b = 0; b < numBands_; ++b)

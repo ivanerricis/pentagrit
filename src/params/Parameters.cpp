@@ -119,10 +119,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 
     constexpr float xoverDefaults[kNumXovers] = {120.0f, 1200.0f, 3500.0f, 8000.0f};
     for (int i = 0; i < kNumXovers; ++i)
+    {
         layout.add(std::make_unique<juce::AudioParameterFloat>(
             makeID(pid::xover[static_cast<size_t>(i)]), "Crossover " + juce::String(i + 1), logFreqRange(),
             xoverDefaults[i],
             Attr().withLabel("Hz").withStringFromValueFunction(hzText).withValueFromStringFunction(hzValue)));
+    }
 
     layout.add(boolParam(pid::bypass, "Bypass", false));
     layout.add(boolParam(pid::driveComp, "Drive Compensation", false));
@@ -175,7 +177,9 @@ ParamRefs::ParamRefs(juce::AudioProcessorValueTreeState& apvts)
     driveComp = raw(pid::driveComp);
     lookahead = raw(pid::lookahead);
     for (size_t i = 0; i < xover.size(); ++i)
+    {
         xover[i] = raw(pid::xover[i]);
+    }
 
     for (int b = 0; b < kMaxBands; ++b)
     {
@@ -216,7 +220,9 @@ EngineSettings ParamRefs::snapshot() const noexcept
         juce::jlimit(0, static_cast<int>(kLookaheadMs.size()) - 1, juce::roundToInt(ld(lookahead))))];
     s.numBands = juce::jlimit(2, kMaxBands, juce::roundToInt(ld(numBands)));
     for (size_t i = 0; i < xover.size(); ++i)
+    {
         s.xoverHz[i] = ld(xover[i]);
+    }
 
     for (size_t b = 0; b < bands.size(); ++b)
     {

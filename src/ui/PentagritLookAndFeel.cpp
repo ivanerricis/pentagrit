@@ -22,7 +22,9 @@ void PentagritLookAndFeel::setStyle(Style t)
 const Palette& PentagritLookAndFeel::paletteFor(const juce::Component& c)
 {
     if (auto* lf = dynamic_cast<PentagritLookAndFeel*>(&c.getLookAndFeel()))
+    {
         return lf->pal();
+    }
     return palette(Style::studioDark);
 }
 
@@ -216,9 +218,13 @@ void PentagritLookAndFeel::drawGear(juce::Graphics& g, juce::Rectangle<float> a,
         const float ang = juce::MathConstants<float>::twoPi * (static_cast<float>(i) - 0.5f) / steps;
         const juce::Point<float> pt(c.x + std::cos(ang) * rr, c.y + std::sin(ang) * rr);
         if (i == 0)
+        {
             p.startNewSubPath(pt);
+        }
         else
+        {
             p.lineTo(pt);
+        }
     }
     p.closeSubPath();
     p.addEllipse(c.x - r * 0.32f, c.y - r * 0.32f, r * 0.64f, r * 0.64f);
@@ -236,17 +242,27 @@ void PentagritLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButto
     auto fillOn = pal_->act;
     bool onBand = false;
     if (kind == "mute")
+    {
         fillOn = pal_->mute, onBand = true;
+    }
     else if (kind == "solo")
+    {
         fillOn = pal_->solo, onBand = true;
+    }
     else if (kind == "bypass")
+    {
         fillOn = pal_->bypass, onBand = true;
+    }
     else if (kind == "warn")
+    {
         fillOn = pal_->warn, onBand = true;
+    }
 
     juce::Colour bg = on ? fillOn : (hl || down ? pal_->bg3 : pal_->bg2);
     if (!en)
+    {
         bg = bg.withAlpha(0.5f);
+    }
     const bool small = kind == "mute" || kind == "solo" || kind == "bypass";
     const float radius = small ? pal_->rSmall : pal_->rButton;
     const auto onColour = onBand ? pal_->onBand : pal_->onAct;

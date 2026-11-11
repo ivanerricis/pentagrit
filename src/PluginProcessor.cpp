@@ -64,13 +64,17 @@ public:
         start_.assign(n, 0.0f);
         open_.assign(n, false);
         for (auto* p : processor_.getParameters())
+        {
             p->addListener(this);
+        }
     }
 
     ~UndoRecorder() override
     {
         for (auto* p : processor_.getParameters())
+        {
             p->removeListener(this);
+        }
     }
 
     bool isGestureOpen() const noexcept { return depth_ > 0; }
@@ -83,16 +87,22 @@ private:
         // Message thread only; undo/redo and the state restore do not record themselves.
         if (!juce::MessageManager::getInstance()->isThisTheMessageThread() || um_.isPerformingUndoRedo() ||
             index < 0 || static_cast<size_t>(index) >= open_.size())
+        {
             return;
+        }
         const auto i = static_cast<size_t>(index);
         auto* param = processor_.getParameters()[index];
 
         if (starting)
         {
             if (open_[i] || processor_.undoPause_ > 0)
+            {
                 return;
+            }
             if (depth_ == 0)
+            {
                 um_.beginNewTransaction(param->getName(64));
+            }
             open_[i] = true;
             start_[i] = param->getValue();
             ++depth_;
@@ -100,12 +110,16 @@ private:
         else
         {
             if (!open_[i])
+            {
                 return;
+            }
             open_[i] = false;
             --depth_;
             const float now = param->getValue();
             if (!juce::approximatelyEqual(start_[i], now))
+            {
                 um_.perform(new ParameterChangeAction(*param, start_[i], now));
+            }
         }
     }
 
@@ -133,7 +147,9 @@ PentagritAudioProcessor::PentagritAudioProcessor()
     // preset), so the startup preset never overrides a restored session.
     const auto& s = settings_->get();
     if (s.presetFolder.isNotEmpty())
+    {
         presetManager_.setUserFolder(settings_->getEffectivePresetFolder());
+    }
     SettingsManager::applyStartupPreset(s, presetManager_);
 
     settings_->addChangeListener(this);
@@ -153,9 +169,13 @@ void PentagritAudioProcessor::clearUndoHistory()
     // Some hosts restore the state from another thread: the UndoManager is only touched on the message thread
     // (the timer below picks the request up).
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+    {
         undoManager_.clearUndoHistory();
+    }
     else
+    {
         pendingUndoClear_.store(true, std::memory_order_release);
+    }
 }
 
 bool PentagritAudioProcessor::isUiGestureOpen() const noexcept
@@ -173,7 +193,9 @@ void PentagritAudioProcessor::changeListenerCallback(juce::ChangeBroadcaster* so
     {
         const auto folder = settings_->getEffectivePresetFolder();
         if (folder != presetManager_.getUserFolder())
+        {
             presetManager_.setUserFolder(folder);
+        }
     }
 }
 
@@ -195,10 +217,14 @@ void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 void PentagritAudioProcessor::timerCallback()
 {
     if (pendingUndoClear_.exchange(false, std::memory_order_acq_rel))
+    {
         undoManager_.clearUndoHistory();
+    }
     const int latency = pendingLatency_.load(std::memory_order_relaxed);
     if (latency != getLatencySamples())
+    {
         setLatencySamples(latency);
+    }
 }
 
 void PentagritAudioProcessor::releaseResources() {}
@@ -207,7 +233,9 @@ bool PentagritAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
 {
     const auto& out = layouts.getMainOutputChannelSet();
     if (out != juce::AudioChannelSet::mono() && out != juce::AudioChannelSet::stereo())
+    {
         return false;
+    }
     return out == layouts.getMainInputChannelSet();
 }
 
@@ -216,7 +244,9 @@ void PentagritAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     juce::ScopedNoDenormals noDenormals;
     const auto startTicks = juce::Time::getHighResolutionTicks();
     for (int ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch)
+    {
         buffer.clear(ch, 0, buffer.getNumSamples());
+    }
 
     // Settings (incl. the live/render oversampling factor) are applied before the block; a factor, phase or
     // band count change reconfigures the engine and changes the latency, which the message-thread timer
@@ -254,26 +284,36 @@ void PentagritAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     auto state = apvts_.copyState();
     state.setProperty(kStateVersionProp, kStateVersion, nullptr);
     if (auto xml = state.createXml())
+    {
         copyXmlToBinary(*xml, destData);
+    }
 }
 
 void PentagritAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (data == nullptr || sizeInBytes <= 0)
+    {
         return;
+    }
 
     auto xml = getXmlFromBinary(data, sizeInBytes);
     if (xml == nullptr || !xml->hasTagName(kStateTag))
+    {
         return;
+    }
 
     auto tree = juce::ValueTree::fromXml(*xml);
     if (!tree.isValid())
+    {
         return;
+    }
 
     // A missing version means version 1. A state written by a newer plugin is not loaded.
     const int version = static_cast<int>(tree.getProperty(kStateVersionProp, 1));
     if (version > kStateVersion)
+    {
         return;
+    }
 
     migrateState(tree, version);
     apvts_.replaceState(tree);

@@ -27,7 +27,9 @@ void Footer::setCpu(float fraction)
     {
         cpu_ = t;
         if (showCpu_)
+        {
             repaint();
+        }
     }
 }
 
@@ -48,7 +50,9 @@ void Footer::paint(juce::Graphics& g)
     g.setColour(p.ink2);
 
     if (showCpu_)
+    {
         g.drawText(cpu_, b.removeFromRight(86), juce::Justification::centredRight, false);
+    }
     g.setColour(p.ink3);
     g.drawText(juce::String("v") + info::kVersion + "  |  AGPL-3.0-or-later", b.removeFromRight(190),
                juce::Justification::centredRight, false);

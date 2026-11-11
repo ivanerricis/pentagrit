@@ -27,7 +27,9 @@ void addEntryItems(juce::PopupMenu& menu, const std::vector<PresetEntry>& entrie
 PresetBar::PresetBar(PresetManager& manager) : manager_(manager)
 {
     for (auto* b : {&prev_, &name_, &next_, &menu_, &slotA_, &slotB_})
+    {
         addAndMakeVisible(*b);
+    }
 
     prev_.setTooltip("Previous preset");
     next_.setTooltip("Next preset");
@@ -99,14 +101,20 @@ void PresetBar::report(const juce::Result& result, const juce::String& successMe
     if (result.wasOk())
     {
         if (successMessage.isNotEmpty() && onMessage)
+        {
             onMessage(successMessage);
+        }
         return;
     }
     if (onMessage)
+    {
         onMessage(result.getErrorMessage());
+    }
     else
+    {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Pentagrit presets",
                                                result.getErrorMessage());
+    }
 }
 
 // ---- Browser
@@ -120,7 +128,9 @@ void PresetBar::showBrowserMenu()
     auto pick = [safe](const PresetEntry& e)
     {
         if (safe != nullptr)
+        {
             safe->report(safe->manager_.loadPreset(e));
+        }
     };
 
     juce::PopupMenu root;
@@ -140,14 +150,18 @@ void PresetBar::showBrowserMenu()
     {
         const auto entries = manager_.getPresetsInCategory(false, cat);
         if (entries.empty())
+        {
             continue;
+        }
         anyUser = true;
         juce::PopupMenu sub;
         addEntryItems(sub, entries, current, pick);
         user.addSubMenu(cat, sub, true, nullptr, !current.factory && current.category == cat);
     }
     if (!anyUser)
+    {
         user.addItem("(empty)", false, false, nullptr);
+    }
     root.addSubMenu("User", user, true, nullptr, !current.factory);
 
     root.showMenuAsync(
@@ -167,54 +181,72 @@ void PresetBar::showActionsMenu()
               [safe]
               {
                   if (safe == nullptr)
+                  {
                       return;
+                  }
                   if (safe->manager_.isCurrentFactory())
                   {
                       if (safe->onMessage)
+                      {
                           safe->onMessage("Factory presets are read-only. Use Save As.");
+                      }
                       safe->promptSaveAs();
                   }
                   else
+                  {
                       safe->report(safe->manager_.save(),
                                    "Saved \"" + safe->manager_.getCurrentName() + "\"");
+                  }
               });
     m.addItem("Save As...",
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->promptSaveAs();
+                  }
               });
     m.addItem("Rename...", !factory, false,
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->promptRename();
+                  }
               });
     m.addItem("Delete...", !factory, false,
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->confirmDelete();
+                  }
               });
     m.addItem("Duplicate",
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->report(safe->manager_.duplicateCurrent(),
                                    "Duplicated as \"" + safe->manager_.getCurrentName() + "\"");
+                  }
               });
     m.addSeparator();
     m.addItem("Import...",
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->chooseImport();
+                  }
               });
     m.addItem("Export...",
               [safe]
               {
                   if (safe != nullptr)
+                  {
                       safe->chooseExport();
+                  }
               });
 
     m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&menu_));
@@ -242,7 +274,9 @@ void PresetBar::promptSaveAs()
                             [safe, aw](int result)
                             {
                                 if (result != 1 || safe == nullptr)
+                                {
                                     return;
+                                }
                                 const auto name = aw->getTextEditorContents("name");
                                 const auto cat = aw->getComboBoxComponent("category")->getText();
                                 auto r = safe->manager_.saveAs(name, cat, false);
@@ -256,7 +290,9 @@ void PresetBar::promptSaveAs()
                                         [safe, name, cat](int answer)
                                         {
                                             if (answer == 1 && safe != nullptr)
+                                            {
                                                 safe->report(safe->manager_.saveAs(name, cat, true), "Saved");
+                                            }
                                         });
                                     return;
                                 }
@@ -277,8 +313,10 @@ void PresetBar::promptRename()
                             [safe, aw](int result)
                             {
                                 if (result == 1 && safe != nullptr)
+                                {
                                     safe->report(safe->manager_.rename(aw->getTextEditorContents("name")),
                                                  "Renamed");
+                                }
                             }),
                         true);
 }
@@ -293,7 +331,9 @@ void PresetBar::confirmDelete()
         [safe](int r)
         {
             if (r == 1 && safe != nullptr)
+            {
                 safe->report(safe->manager_.deleteCurrent(), "Deleted");
+            }
         });
 }
 
@@ -307,11 +347,15 @@ void PresetBar::chooseImport()
                           {
                               const auto file = fc.getResult();
                               if (safe == nullptr || file == juce::File())
+                              {
                                   return;
+                              }
                               PresetEntry created;
                               auto r = safe->manager_.importPreset(file, &created);
                               if (r.wasOk())
+                              {
                                   r = safe->manager_.loadPreset(created);
+                              }
                               safe->report(r, "Imported \"" + created.name + "\"");
                           });
 }
@@ -330,7 +374,9 @@ void PresetBar::chooseExport()
                           {
                               const auto file = fc.getResult();
                               if (safe == nullptr || file == juce::File())
+                              {
                                   return;
+                              }
                               safe->report(safe->manager_.exportCurrent(file),
                                            "Exported to " + file.getFileName());
                           });

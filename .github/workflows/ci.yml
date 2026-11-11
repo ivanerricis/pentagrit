@@ -39,9 +39,8 @@ jobs:
             | xargs --no-run-if-empty clang-format-18 --dry-run --Werror
 
   clang-tidy:
-    name: clang-tidy (advisory)
+    name: clang-tidy
     runs-on: ubuntu-24.04
-    continue-on-error: true
     env:
       CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
     steps:
@@ -64,17 +63,18 @@ jobs:
         run: cmake --build build/ci-linux --target PentagritUiAssets PentagritPresetData
       - name: clang-tidy
         # Header filter anchored to this repo's src/ so .cpm and build/ headers are excluded.
+        # Any project warning fails the job (third-party diagnostics are filtered out).
         run: |
           git ls-files 'src/*.cpp' \
             | xargs --no-run-if-empty clang-tidy-18 -p build/ci-linux --quiet \
+                --warnings-as-errors='*' \
                 --header-filter="^${GITHUB_WORKSPACE}/src/.*"
 
   # AddressSanitizer + UndefinedBehaviorSanitizer on a Debug build (JUCE jasserts active).
   sanitizers:
-    name: asan-ubsan (advisory)
-    # Advisory for now: remove continue-on-error and make it a required check once it is clean.
+    name: asan-ubsan
+    # Enforced: a sanitizer finding or a test failure fails the job (required check).
     runs-on: ubuntu-24.04
-    continue-on-error: true
     timeout-minutes: 60
     env:
       CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
@@ -108,7 +108,7 @@ jobs:
         # The test binary is run directly because ctest cannot filter on Catch2 tags.
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=0
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
           xvfb-run -a "$exe" '~[allocation]'

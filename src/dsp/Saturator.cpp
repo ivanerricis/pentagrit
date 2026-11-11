@@ -3,6 +3,7 @@
 #include "dsp/DspUtils.h"
 
 #include <array>
+#include <cmath>
 
 namespace pentagrit
 {
@@ -30,7 +31,7 @@ void Saturator::prepare(double procRate, int, int numCh)
 void Saturator::updateCoefficients() noexcept
 {
     driveCoeff_ = timeToCoeff(kDriveSmoothSec, rate_);
-    fadeLen_ = std::max(1, static_cast<int>(kFadeSec * rate_ + 0.5));
+    fadeLen_ = std::max(1, static_cast<int>(std::lround(kFadeSec * rate_)));
     fadePos_ = std::min(fadePos_, fadeLen_);
     dcCoeff_ = static_cast<float>(std::exp(-2.0 * 3.14159265358979323846 * kDcHz / rate_));
     compStep_ = static_cast<float>(1.0 / (kCompSec * rate_));
@@ -56,7 +57,9 @@ void Saturator::reset() noexcept
 void Saturator::setType(SatType type) noexcept
 {
     if (type == type_)
+    {
         return;
+    }
     prevType_ = type_;
     type_ = type;
     fadePos_ = 0;
@@ -155,7 +158,9 @@ void adaaBlock(const float* __restrict u, float uPrev, float* __restrict s, int 
 {
     s[0] = Kernel(clampTo(u[0], -kAdaaClampU, kAdaaClampU), clampTo(uPrev, -kAdaaClampU, kAdaaClampU));
     for (int i = 1; i < n; ++i)
+    {
         s[i] = Kernel(clampTo(u[i], -kAdaaClampU, kAdaaClampU), clampTo(u[i - 1], -kAdaaClampU, kAdaaClampU));
+    }
 }
 
 // Vectorizable block version of Saturator::shape (u -> s), same maths except hard clip and wavefold, which
@@ -169,7 +174,9 @@ void shapeBlock(SatType type, const float* __restrict u, float uPrev, float* __r
             break;
         case SatType::tanh:
             for (int i = 0; i < n; ++i)
+            {
                 s[i] = fastTanh(u[i]);
+            }
             break;
         case SatType::softClip:
             for (int i = 0; i < n; ++i)
@@ -180,7 +187,9 @@ void shapeBlock(SatType type, const float* __restrict u, float uPrev, float* __r
             break;
         case SatType::tube:
             for (int i = 0; i < n; ++i)
+            {
                 s[i] = fastTanh(u[i] + 0.25f) - kTubeOffset;
+            }
             break;
         case SatType::wavefold:
             adaaBlock<wavefoldAdaa>(u, uPrev, s, n);
@@ -195,9 +204,13 @@ void shapeBlock(SatType type, const float* __restrict u, float uPrev, float* __r
 void applyComp(SatType type, const float* __restrict comp, float* __restrict s, int n) noexcept
 {
     if (type == SatType::off)
+    {
         return;
+    }
     for (int i = 0; i < n; ++i)
+    {
         s[i] *= comp[i];
+    }
 }
 } // namespace
 
@@ -218,7 +231,9 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
     const auto numCh = std::min(block.getNumChannels(), dcX1_.size());
     const auto numSamples = static_cast<int>(block.getNumSamples());
     if (numCh == 0 || numSamples == 0)
+    {
         return;
+    }
 
     const float invFade = 1.0f / static_cast<float>(fadeLen_);
     float g = smoothGain_;
@@ -234,11 +249,13 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
         // the target the gain is constant and the recursion is skipped.
         const bool constGain = g == targetGain_;
         if (!constGain)
+        {
             for (int i = 0; i < len; ++i)
             {
                 g = targetGain_ + driveCoeff_ * (g - targetGain_);
                 gain[i] = g;
             }
+        }
         const float tg = targetGain_;
         const bool chunkFading = fp < fadeLen_;
 
@@ -252,9 +269,13 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
             for (int i = 0; i < len; ++i)
             {
                 if (w < wTarget)
+                {
                     w = std::min(w + compStep_, wTarget);
+                }
                 else if (w > wTarget)
+                {
                     w = std::max(w - compStep_, wTarget);
+                }
                 // 1 + w * (1 / drive - 1): no compensation at w = 0, 1 / drive at w = 1.
                 comp[i] = 1.0f + w * (1.0f / std::max(constGain ? tg : gain[i], 1.0e-6f) - 1.0f);
             }
@@ -269,11 +290,19 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
                 float* d = block.getChannelPointer(ch0 + k) + start;
                 float* s = sb[k];
                 if (constGain)
+                {
                     for (int i = 0; i < len; ++i)
+                    {
                         u[i] = d[i] * tg;
+                    }
+                }
                 else
+                {
                     for (int i = 0; i < len; ++i)
+                    {
                         u[i] = d[i] * gain[i];
+                    }
+                }
 
                 if (chunkFading)
                 {
@@ -309,7 +338,9 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
                 {
                     shapeBlock(type_, u, uPrev_[ch0 + k], s, len);
                     if (compActive)
+                    {
                         applyComp(type_, comp, s, len);
+                    }
                 }
                 uPrev_[ch0 + k] = u[len - 1];
             }
@@ -356,7 +387,9 @@ void Saturator::process(const juce::dsp::AudioBlock<float>& block) noexcept
             }
         }
         if (chunkFading)
+        {
             fp = std::min(fp + len, fadeLen_);
+        }
     }
     smoothGain_ = g;
     compW_ = w;

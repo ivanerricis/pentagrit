@@ -92,10 +92,16 @@ inline const char* styleId(Style s) noexcept
 inline Style styleFromId(const juce::String& id) noexcept
 {
     for (int i = 0; i < kNumStyles; ++i)
+    {
         if (id == styleId(static_cast<Style>(i)))
+        {
             return static_cast<Style>(i);
+        }
+    }
     if (id == "light")
+    {
         return Style::paperLight;
+    }
     return Style::studioDark;
 }
 
