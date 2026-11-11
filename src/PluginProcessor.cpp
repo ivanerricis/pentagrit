@@ -30,10 +30,12 @@ PentagritAudioProcessor::PentagritAudioProcessor()
 
     settings_->addChangeListener(this);
     presetManager_.addChangeListener(this);
+    startTimerHz(30);
 }
 
 PentagritAudioProcessor::~PentagritAudioProcessor()
 {
+    stopTimer();
     presetManager_.removeChangeListener(this);
     settings_->removeChangeListener(this);
 }
@@ -63,7 +65,15 @@ void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     engine_.setNonRealtime(isNonRealtime());
     engine_.prepare(sampleRate, samplesPerBlock, juce::jmax(1, getTotalNumOutputChannels()));
     engine_.setSettings(params_.snapshot());
+    pendingLatency_.store(engine_.getLatencySamples(), std::memory_order_relaxed);
     setLatencySamples(engine_.getLatencySamples());
+}
+
+void PentagritAudioProcessor::timerCallback()
+{
+    const int latency = pendingLatency_.load(std::memory_order_relaxed);
+    if (latency != getLatencySamples())
+        setLatencySamples(latency);
 }
 
 void PentagritAudioProcessor::releaseResources() {}
@@ -84,14 +94,13 @@ void PentagritAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
         buffer.clear(ch, 0, buffer.getNumSamples());
 
     // Settings (incl. the live/render oversampling factor) are applied before the block; a factor, phase or
-    // band count change reconfigures the engine and changes the latency, which is reported below.
+    // band count change reconfigures the engine and changes the latency, which the message-thread timer
+    // reports.
     engine_.setNonRealtime(isNonRealtime());
     engine_.setSettings(params_.snapshot());
     engine_.process(buffer);
 
-    const int latency = engine_.getLatencySamples();
-    if (latency != getLatencySamples())
-        setLatencySamples(latency);
+    pendingLatency_.store(engine_.getLatencySamples(), std::memory_order_relaxed);
 
     // Smoothed fraction of the block time spent here (cheap, realtime safe).
     if (currentSampleRate_ > 0.0 && buffer.getNumSamples() > 0)
@@ -133,8 +142,22 @@ void PentagritAudioProcessor::setStateInformation(const void* data, int sizeInBy
         return;
 
     auto tree = juce::ValueTree::fromXml(*xml);
-    if (tree.isValid())
-        apvts_.replaceState(tree);
+    if (!tree.isValid())
+        return;
+
+    // A missing version means version 1. A state written by a newer plugin is not loaded.
+    const int version = static_cast<int>(tree.getProperty(kStateVersionProp, 1));
+    if (version > kStateVersion)
+        return;
+
+    migrateState(tree, version);
+    apvts_.replaceState(tree);
+}
+
+void PentagritAudioProcessor::migrateState(juce::ValueTree&, int)
+{
+    // Place for future migrations: when kStateVersion is bumped, upgrade the tree here step by step
+    // (if (fromVersion < 2) { ... }). Version 1 is the current layout, so nothing to do yet.
 }
 
 juce::Point<int> PentagritAudioProcessor::getUiSize() const

@@ -78,3 +78,52 @@ TEST_CASE("Garbage state is ignored", "[state]")
 
     CHECK(raw(p, pid::numBands) == Approx(4.0f));
 }
+
+TEST_CASE("Future-version state is rejected, old and version-less states load", "[state]")
+{
+    auto makeBlock = [](PentagritAudioProcessor& src, int version, bool withVersion)
+    {
+        juce::MemoryBlock block;
+        src.getStateInformation(block);
+        auto xml = juce::AudioProcessor::getXmlFromBinary(block.getData(), static_cast<int>(block.getSize()));
+        REQUIRE(xml != nullptr);
+        if (withVersion)
+            xml->setAttribute("stateVersion", version);
+        else
+            xml->removeAttribute("stateVersion");
+        juce::MemoryBlock out;
+        juce::AudioProcessor::copyXmlToBinary(*xml, out);
+        return out;
+    };
+
+    PentagritAudioProcessor src;
+    setValue(src, pid::inGain, -6.0f);
+    setValue(src, pid::numBands, 5.0f);
+
+    SECTION("future version leaves parameters untouched")
+    {
+        const auto block = makeBlock(src, kStateVersion + 1, true);
+        PentagritAudioProcessor p;
+        setValue(p, pid::numBands, 4.0f);
+        setValue(p, pid::inGain, 3.0f);
+        p.setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        CHECK(raw(p, pid::numBands) == Approx(4.0f));
+        CHECK(raw(p, pid::inGain) == Approx(3.0f).margin(0.05f));
+    }
+    SECTION("version 1 loads")
+    {
+        const auto block = makeBlock(src, 1, true);
+        PentagritAudioProcessor p;
+        p.setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        CHECK(raw(p, pid::numBands) == Approx(5.0f));
+        CHECK(raw(p, pid::inGain) == Approx(-6.0f).margin(0.05f));
+    }
+    SECTION("missing version loads as version 1")
+    {
+        const auto block = makeBlock(src, 0, false);
+        PentagritAudioProcessor p;
+        p.setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        CHECK(raw(p, pid::numBands) == Approx(5.0f));
+        CHECK(raw(p, pid::inGain) == Approx(-6.0f).margin(0.05f));
+    }
+}

@@ -7,12 +7,16 @@
 #include "settings/SettingsManager.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <atomic>
+
 namespace pentagrit
 {
 inline constexpr int kDefaultUiWidth = 900;
 inline constexpr int kDefaultUiHeight = 600;
 
-class PentagritAudioProcessor final : public juce::AudioProcessor, private juce::ChangeListener
+class PentagritAudioProcessor final : public juce::AudioProcessor,
+                                      private juce::ChangeListener,
+                                      private juce::Timer
 {
 public:
     PentagritAudioProcessor();
@@ -56,6 +60,10 @@ public:
 
 private:
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    // Message thread: forwards the engine latency (stored by the audio thread) to the host.
+    void timerCallback() override;
+    // Single place for state migrations; called with the version found in the saved state.
+    static void migrateState(juce::ValueTree& state, int fromVersion);
 
     juce::AudioProcessorValueTreeState apvts_;
     ParamRefs params_;
@@ -63,6 +71,7 @@ private:
     PresetManager presetManager_;
     juce::SharedResourcePointer<SettingsManager> settings_;
     double currentSampleRate_ = 0.0;
+    std::atomic<int> pendingLatency_{0};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PentagritAudioProcessor)
 };

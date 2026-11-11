@@ -37,6 +37,26 @@ juce::String hzText(float v, int)
     return v >= 1000.0f ? juce::String(v / 1000.0f, 2) + " kHz" : juce::String(juce::roundToInt(v)) + " Hz";
 }
 
+// Typed-text parsers, the inverse of the *Text formatters above. They accept the displayed form (with unit)
+// as well as a bare number, so hosts that convert typed text get the same value the display shows.
+float dbValue(const juce::String& text)
+{
+    return text.getFloatValue();
+}
+
+float percentValue(const juce::String& text)
+{
+    return text.getFloatValue() / 100.0f;
+}
+
+float hzValue(const juce::String& text)
+{
+    const auto t = text.trim().toLowerCase();
+    const float v = t.getFloatValue();
+    // "1.2 kHz", "1.2k"; the number parser stops at the first non-numeric character.
+    return t.containsChar('k') ? v * 1000.0f : v;
+}
+
 // Logarithmic 20 Hz .. 20 kHz range.
 juce::NormalisableRange<float> logFreqRange()
 {
@@ -57,15 +77,15 @@ std::unique_ptr<juce::AudioParameterFloat> dbParam(const juce::String& id, const
 {
     return std::make_unique<juce::AudioParameterFloat>(
         makeID(id), name, juce::NormalisableRange<float>(lo, hi, 0.1f), def,
-        Attr().withLabel("dB").withStringFromValueFunction(dbText));
+        Attr().withLabel("dB").withStringFromValueFunction(dbText).withValueFromStringFunction(dbValue));
 }
 
 std::unique_ptr<juce::AudioParameterFloat> unitParam(const juce::String& id, const juce::String& name,
                                                      float def)
 {
-    return std::make_unique<juce::AudioParameterFloat>(makeID(id), name,
-                                                       juce::NormalisableRange<float>(0.0f, 1.0f), def,
-                                                       Attr().withStringFromValueFunction(percentText));
+    return std::make_unique<juce::AudioParameterFloat>(
+        makeID(id), name, juce::NormalisableRange<float>(0.0f, 1.0f), def,
+        Attr().withStringFromValueFunction(percentText).withValueFromStringFunction(percentValue));
 }
 
 std::unique_ptr<juce::AudioParameterBool> boolParam(const juce::String& id, const juce::String& name,
@@ -83,22 +103,26 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add(dbParam(pid::outGain, "Output Gain", -24.0f, 24.0f, 0.0f));
     layout.add(unitParam(pid::mix, "Mix", 1.0f));
     layout.add(boolParam(pid::autoGain, "Auto Gain", false));
-    layout.add(std::make_unique<juce::AudioParameterChoice>(makeID(pid::oversampling), "Oversampling",
-                                                            juce::StringArray{"Off", "2x", "4x", "8x"}, 1));
-    // Non-automatable, saved with the project.
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        makeID(pid::oversampling), "Oversampling", juce::StringArray{"Off", "2x", "4x", "8x"}, 1,
+        juce::AudioParameterChoiceAttributes().withAutomatable(false)));
+    // Non-automatable (like numBands): changes alter latency and reset filters. Saved with the project.
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         makeID(pid::osPhase), "OS Phase", juce::StringArray{"Linear", "Minimum"}, 0,
         juce::AudioParameterChoiceAttributes().withAutomatable(false)));
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         makeID(pid::osRender), "OS Render", juce::StringArray{"Same as live", "2x", "4x", "8x"}, 0,
         juce::AudioParameterChoiceAttributes().withAutomatable(false)));
-    layout.add(std::make_unique<juce::AudioParameterInt>(makeID(pid::numBands), "Bands", 2, kMaxBands, 3));
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        makeID(pid::numBands), "Bands", 2, kMaxBands, 3,
+        juce::AudioParameterIntAttributes().withAutomatable(false)));
 
     constexpr float xoverDefaults[kNumXovers] = {120.0f, 1200.0f, 3500.0f, 8000.0f};
     for (int i = 0; i < kNumXovers; ++i)
         layout.add(std::make_unique<juce::AudioParameterFloat>(
             makeID(pid::xover[static_cast<size_t>(i)]), "Crossover " + juce::String(i + 1), logFreqRange(),
-            xoverDefaults[i], Attr().withLabel("Hz").withStringFromValueFunction(hzText)));
+            xoverDefaults[i],
+            Attr().withLabel("Hz").withStringFromValueFunction(hzText).withValueFromStringFunction(hzValue)));
 
     layout.add(boolParam(pid::bypass, "Bypass", false));
 
