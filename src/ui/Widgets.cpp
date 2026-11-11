@@ -219,13 +219,45 @@ void LabelledKnob::resized()
         editor_->setBounds(getLocalBounds().removeFromBottom(14).reduced(2, 0));
 }
 
+juce::Font LabelledKnob::captionFont() const
+{
+    // Normal caption: 10 px with 0.08 tracking. In a narrow cell (5 bands) the tracking goes first, then the
+    // size, so that the text stays inside the cell with kCaptionGap px to spare and never gets squeezed
+    // against the neighbouring caption.
+    const float avail = static_cast<float>(getWidth() - kCaptionGap);
+    auto widthOf = [this](const juce::Font& f)
+    {
+        juce::GlyphArrangement ga;
+        ga.addLineOfText(f, label_, 0.0f, 0.0f);
+        return ga.getBoundingBox(0, -1, true).getWidth();
+    };
+    auto font = fonts::sans(10.0f, fonts::Weight::medium, 0.08f);
+    if (getWidth() <= 0 || widthOf(font) <= avail)
+    {
+        return font;
+    }
+    font = fonts::sans(10.0f, fonts::Weight::medium, 0.0f);
+    for (float size = 10.0f; widthOf(font) > avail && size > kCaptionMinSize; size -= 0.25f)
+    {
+        font = fonts::sans(size, fonts::Weight::medium, 0.0f);
+    }
+    return font;
+}
+
+float LabelledKnob::captionWidth() const
+{
+    juce::GlyphArrangement ga;
+    ga.addLineOfText(captionFont(), label_, 0.0f, 0.0f);
+    return ga.getBoundingBox(0, -1, true).getWidth();
+}
+
 void LabelledKnob::paint(juce::Graphics& g)
 {
     const auto& p = pal(*this);
     auto b = getLocalBounds();
     g.setColour(p.ink3);
-    g.setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));
-    g.drawFittedText(label_, b.removeFromTop(12), juce::Justification::centred, 1, 0.7f);
+    g.setFont(captionFont());
+    g.drawText(label_, b.removeFromTop(12), juce::Justification::centred, false);
     if (editor_ == nullptr)
     {
         g.setColour(p.ink2);

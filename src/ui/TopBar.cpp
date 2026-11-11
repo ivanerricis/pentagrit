@@ -123,7 +123,9 @@ void TopBar::tick()
         return;
     lastLatency_ = lat;
     lastRate_ = sr;
-    latencyText_ = sr > 0.0 ? juce::String(lat * 1000.0 / sr, 2) + " ms  " + juce::String(lat) + " smp"
+    // One decimal below 100 ms, none above, so the text stays short (at most "5.3 ms  1009 smp" in practice).
+    const double ms = sr > 0.0 ? lat * 1000.0 / sr : 0.0;
+    latencyText_ = sr > 0.0 ? juce::String(ms, ms >= 100.0 ? 0 : 1) + " ms  " + juce::String(lat) + " smp"
                             : juce::String(lat) + " smp";
     repaint(latencyArea_);
 }
@@ -145,7 +147,7 @@ void TopBar::resized()
     b.removeFromRight(gap);
     autoGain_.setBounds(centreV(b.removeFromRight(74)));
     b.removeFromRight(gap);
-    latencyArea_ = b.removeFromRight(112);
+    latencyArea_ = b.removeFromRight(kLatencyW);
     b.removeFromRight(gap);
     os_.setBounds(centreV(b.removeFromRight(4 * 28 + 4)));
     osLabelArea_ = b.removeFromRight(22);
@@ -158,6 +160,32 @@ void TopBar::resized()
     undo_.setBounds(centreV(b.removeFromRight(20)));
     b.removeFromRight(gap);
     presetSlot_.setBounds(b.withSizeKeepingCentre(juce::jmax(0, b.getWidth()), 30));
+}
+
+juce::Font TopBar::latencyFont() const
+{
+    // Normal size, shrunk (never below 8.5 px) when the text would not fit its area with the side padding.
+    const float avail = static_cast<float>(latencyArea_.getWidth() - 2 * kLatencyPad);
+    auto widthOf = [this](const juce::Font& f)
+    {
+        juce::GlyphArrangement ga;
+        ga.addLineOfText(f, latencyText_, 0.0f, 0.0f);
+        return ga.getBoundingBox(0, -1, true).getWidth();
+    };
+    auto font = fonts::mono(10.5f, fonts::Weight::regular);
+    for (float size = 10.5f; latencyArea_.getWidth() > 0 && widthOf(font) > avail && size > 8.5f;
+         size -= 0.25f)
+    {
+        font = fonts::mono(size, fonts::Weight::regular);
+    }
+    return font;
+}
+
+float TopBar::latencyTextWidth() const
+{
+    juce::GlyphArrangement ga;
+    ga.addLineOfText(latencyFont(), latencyText_, 0.0f, 0.0f);
+    return ga.getBoundingBox(0, -1, true).getWidth();
 }
 
 void TopBar::drawLogoMark(juce::Graphics& g, juce::Rectangle<float> area, const Palette& p)
@@ -217,7 +245,7 @@ void TopBar::paint(juce::Graphics& g)
     g.drawText("OS", osLabelArea_, juce::Justification::centredRight, false);
 
     g.setColour(p.ink2);
-    g.setFont(fonts::mono(10.5f, fonts::Weight::regular));
-    g.drawText(latencyText_, latencyArea_, juce::Justification::centredRight, false);
+    g.setFont(latencyFont());
+    g.drawText(latencyText_, latencyArea_.reduced(kLatencyPad, 0), juce::Justification::centredRight, false);
 }
 } // namespace pentagrit::ui

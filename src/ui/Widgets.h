@@ -71,6 +71,14 @@ public:
         return f == Fmt::dbSigned || f == Fmt::dbUnit || f == Fmt::dbSignedUnit;
     }
 
+    // Caption above the knob: font used (shrinks in a narrow cell so neighbouring captions keep a gap), the
+    // width of the text drawn with it, and the clear space kept inside the cell.
+    static constexpr int kCaptionGap = 8;
+    static constexpr float kCaptionMinSize = 8.0f;
+    juce::Font captionFont() const;
+    float captionWidth() const;
+    const juce::String& caption() const noexcept { return label_; }
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
