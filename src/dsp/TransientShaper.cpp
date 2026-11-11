@@ -89,15 +89,25 @@ void TransientShaper::setLowFrequencyHint(float hz) noexcept
 
 void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcept
 {
-    const auto numCh = block.getNumChannels();
-    const auto n = block.getNumSamples();
-    if (numCh == 0 || n == 0)
+    process(juce::dsp::AudioBlock<const float>(block), block);
+}
+
+void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector,
+                              const juce::dsp::AudioBlock<float>& audio) noexcept
+{
+    const auto numCh = audio.getNumChannels();
+    const auto n = audio.getNumSamples();
+    if (numCh == 0 || n == 0 || detector.getNumChannels() < numCh || detector.getNumSamples() < n)
         return;
 
     float* ch[8];
+    const float* det[8];
     const size_t nc = std::min<size_t>(numCh, 8);
     for (size_t c = 0; c < nc; ++c)
-        ch[c] = block.getChannelPointer(c);
+    {
+        ch[c] = audio.getChannelPointer(c);
+        det[c] = detector.getChannelPointer(c);
+    }
 
     float e1 = e1_, e2 = e2_, e3 = e3_, e4 = e4_, g = gSmooth_;
     float lin = lin_, linStep = linStep_;
@@ -140,10 +150,10 @@ void TransientShaper::process(const juce::dsp::AudioBlock<float>& block) noexcep
 
         // Rectified, channel-linked detector input (vectorizable).
         for (size_t k = 0; k < len; ++k)
-            xs[k] = std::abs(ch[0][i + k]);
+            xs[k] = std::abs(det[0][i + k]);
         for (size_t c = 1; c < nc; ++c)
             for (size_t k = 0; k < len; ++k)
-                xs[k] = std::max(xs[k], std::abs(ch[c][i + k]));
+                xs[k] = std::max(xs[k], std::abs(det[c][i + k]));
 
         for (size_t k = 0; k < len; ++k)
         {

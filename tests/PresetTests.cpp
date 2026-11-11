@@ -342,30 +342,35 @@ TEST_CASE("Preset values are clamped and missing parameters use defaults", "[Pre
     CHECK(f.get(pid::outGain) == Approx(0.0f).margin(1e-5f)); // not listed: default
 }
 
-TEST_CASE("osPhase, osRender and bypass survive preset loads", "[Preset]")
+TEST_CASE("osPhase, osRender, lookahead and bypass survive preset loads", "[Preset]")
 {
     Fixture f;
     f.set(pid::osPhase, 1.0f);
     f.set(pid::osRender, 3.0f);
+    f.set(pid::lookahead, 2.0f);
     f.set(pid::bypass, 1.0f);
+    CHECK_FALSE(PresetManager::isPresetParameter(pid::lookahead));
 
     for (const auto& e : f.pm.getFactoryPresets())
     {
         REQUIRE(f.pm.loadPreset(e).wasOk());
         CHECK(f.get(pid::osPhase) == Approx(1.0f));
         CHECK(f.get(pid::osRender) == Approx(3.0f));
+        CHECK(f.get(pid::lookahead) == Approx(2.0f));
         CHECK(f.get(pid::bypass) == Approx(1.0f));
     }
 
     // Also when a user file tries to set them.
     const auto file = f.tmp.dir.getChildFile("presets/Cat/sneaky.pgp");
-    writeText(file, "<PENTAGRIT_PRESET stateVersion=\"1\" name=\"sneaky\"><PENTAGRIT_STATE>"
-                    "<PARAM id=\"osPhase\" value=\"0\"/><PARAM id=\"osRender\" "
-                    "value=\"0\"/></PENTAGRIT_STATE></PENTAGRIT_PRESET>");
+    writeText(file,
+              "<PENTAGRIT_PRESET stateVersion=\"1\" name=\"sneaky\"><PENTAGRIT_STATE>"
+              "<PARAM id=\"osPhase\" value=\"0\"/><PARAM id=\"osRender\" "
+              "value=\"0\"/><PARAM id=\"lookahead\" value=\"0\"/></PENTAGRIT_STATE></PENTAGRIT_PRESET>");
     f.pm.rescan();
     REQUIRE(f.pm.loadPreset(f.pm.getUserPresets()[0]).wasOk());
     CHECK(f.get(pid::osPhase) == Approx(1.0f));
     CHECK(f.get(pid::osRender) == Approx(3.0f));
+    CHECK(f.get(pid::lookahead) == Approx(2.0f));
 
     // The UI size stored in the state is kept as well.
     f.proc.setUiSize(1000, 640);

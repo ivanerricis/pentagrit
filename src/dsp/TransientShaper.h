@@ -5,7 +5,9 @@
 
 namespace pentagrit
 {
-// Differential-envelope transient shaper (stereo-linked, zero latency, no lookahead).
+// Differential-envelope transient shaper (stereo-linked, zero latency by itself). Lookahead is done by the
+// caller: process(detector, audio) measures `detector` and applies the gain to `audio`, which can be a
+// delayed copy of it.
 class TransientShaper
 {
 public:
@@ -16,6 +18,9 @@ public:
     void setParameters(float attackDb, float sustainDb, float speed01) noexcept;
     void setLowFrequencyHint(float hz) noexcept;
     void process(const juce::dsp::AudioBlock<float>& block) noexcept;
+    // Envelope detection on `detector`, gain applied in place to `audio` (same size as `detector`).
+    void process(const juce::dsp::AudioBlock<const float>& detector,
+                 const juce::dsp::AudioBlock<float>& audio) noexcept;
     float getLastGainDb() const noexcept;
 
 private:

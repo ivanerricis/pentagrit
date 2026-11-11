@@ -15,12 +15,12 @@ float raw(PentagritAudioProcessor& p, const juce::String& id)
 }
 } // namespace
 
-TEST_CASE("Parameter layout has 64 unique, versioned IDs", "[parameters]")
+TEST_CASE("Parameter layout has 65 unique, versioned IDs", "[parameters]")
 {
     PentagritAudioProcessor proc;
     const auto& params = proc.getParameters();
     REQUIRE(static_cast<int>(params.size()) == kNumParameters);
-    REQUIRE(kNumParameters == 64);
+    REQUIRE(kNumParameters == 65);
 
     std::set<juce::String> ids;
     for (auto* p : params)
@@ -30,7 +30,7 @@ TEST_CASE("Parameter layout has 64 unique, versioned IDs", "[parameters]")
         ids.insert(withID->getParameterID());
         CHECK(withID->getVersionHint() == kParamVersion);
     }
-    CHECK(ids.size() == 64);
+    CHECK(ids.size() == 65);
 }
 
 TEST_CASE("Band parameter IDs follow the naming scheme", "[parameters]")
@@ -57,6 +57,10 @@ TEST_CASE("Parameter defaults", "[parameters]")
     CHECK(raw(proc, pid::osPhase) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::osRender) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::driveComp) == Approx(0.0f).margin(1e-5f));
+    CHECK(raw(proc, pid::lookahead) == Approx(0.0f).margin(1e-5f));
+    CHECK(proc.getAPVTS().getParameter(pid::lookahead)->getName(64) == "Lookahead");
+    CHECK(proc.getAPVTS().getParameter(pid::lookahead)->getNumSteps() == 4);
+    CHECK_FALSE(proc.getAPVTS().getParameter(pid::lookahead)->isAutomatable());
     CHECK(proc.getAPVTS().getParameter(pid::driveComp)->isAutomatable());
     CHECK(proc.getAPVTS().getParameter(pid::driveComp)->getName(64) == "Drive Compensation");
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::osPhase)->isAutomatable());
@@ -154,6 +158,24 @@ TEST_CASE("snapshot() maps the render oversampling choice", "[parameters]")
     CHECK(refs.snapshot().osRender == OSFactor::x4);
 }
 
+TEST_CASE("snapshot() maps the lookahead choice to milliseconds", "[parameters]")
+{
+    PentagritAudioProcessor proc;
+    auto& apvts = proc.getAPVTS();
+    ParamRefs refs(apvts);
+    CHECK(refs.snapshot().lookaheadMs == 0.0f);
+
+    const float expected[] = {0.0f, 1.0f, 2.0f, 5.0f};
+    const char* names[] = {"Off", "1 ms", "2 ms", "5 ms"};
+    auto* p = apvts.getParameter(pid::lookahead);
+    for (int i = 0; i < 4; ++i)
+    {
+        p->setValueNotifyingHost(p->convertTo0to1(static_cast<float>(i)));
+        CHECK(refs.snapshot().lookaheadMs == expected[i]);
+        CHECK(p->getCurrentValueAsText() == names[i]);
+    }
+}
+
 TEST_CASE("Typed text converts to parameter values", "[parameters]")
 {
     PentagritAudioProcessor proc;
@@ -231,5 +253,6 @@ TEST_CASE("Structural parameters are not automatable", "[parameters]")
     PentagritAudioProcessor proc;
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::oversampling)->isAutomatable());
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::numBands)->isAutomatable());
+    CHECK_FALSE(proc.getAPVTS().getParameter(pid::lookahead)->isAutomatable());
     CHECK(proc.getAPVTS().getParameter(pid::inGain)->isAutomatable());
 }

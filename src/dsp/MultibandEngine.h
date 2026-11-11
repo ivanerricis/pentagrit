@@ -19,6 +19,11 @@ namespace pentagrit
 // input -> [delay line for bypass] -> Oversampler.up -> (dry copy -> allpass chain) -> inGain -> crossover ->
 // bands -> sum -> AutoGain (ref = phase-matched dry taken before inGain) -> global mix with the phase-matched
 // dry -> Oversampler.down -> outGain -> bypass crossfade.
+//
+// Lookahead (EngineSettings::lookaheadMs): every band delays its audio by L base-rate samples (L * factor at
+// the processing rate) while its transient detector sees the undelayed signal; the phase-matched dry is
+// delayed by the same amount, so the band sum, the per-band mix, the global mix and the auto-gain reference
+// stay aligned. The latency is the oversampler latency plus L, and the bypass delay line uses it as well.
 class MultibandEngine
 {
 public:
@@ -36,6 +41,11 @@ public:
     int getLatencySamples() const noexcept;
 
     // Oversampling factor actually used (1, 2, 4 or 8), limited so that sampleRate * factor <= 384 kHz.
+    // Longest lookahead in milliseconds (the parameter's largest choice).
+    static constexpr float kMaxLookaheadMs = 5.0f;
+    // Lookahead delay in base-rate samples for a time in milliseconds (clamped to 0..kMaxLookaheadMs).
+    static int lookaheadSamples(float ms, double sampleRate) noexcept;
+
     static int effectiveFactor(OSFactor requested, double sampleRate) noexcept;
     // Per-band audibility from mute/solo (bands >= numBands are never audible).
     static std::array<bool, kMaxBands> computeAudibility(const EngineSettings& settings) noexcept;
@@ -68,6 +78,8 @@ private:
     int numBands_ = 0;
     OSPhase phase_ = OSPhase::linear;
     int latency_ = 0;
+    int maxLookaheadBase_ = 0; // base-rate samples at kMaxLookaheadMs
+    int lookaheadBase_ = 0;    // current lookahead, base-rate samples
 
     std::array<std::unique_ptr<Oversampler>, 3> fir_, iir_; // factors 2, 4, 8
     Crossover crossover_;
@@ -79,6 +91,8 @@ private:
     juce::AudioBuffer<float> delayed_; // base-rate delayed input (bypass path)
     juce::AudioBuffer<float> delayLine_;
     int delayMask_ = 0, delayPos_ = 0;
+    juce::AudioBuffer<float> dryDelayLine_; // processing-rate delay of the dry (lookahead)
+    int dryDelayMask_ = 0, dryDelayPos_ = 0, dryDelay_ = 0;
     std::vector<float> ramp_;
 
     Smoothed inGain_, mix_, outGain_, bypassW_;

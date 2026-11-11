@@ -534,7 +534,8 @@ void SettingsPanel::updateLatencyText()
     auto& apvts = processor_.getAPVTS();
     const auto os = apvts.getParameter(pid::oversampling)->getCurrentValueAsText();
     const auto phase = apvts.getParameter(pid::osPhase)->getCurrentValueAsText().toLowerCase();
-    juce::String text = "Live (OS " + os + ", " + phase + "): ";
+    const auto lookahead = apvts.getParameter(pid::lookahead)->getCurrentValueAsText();
+    juce::String text = "Live (OS " + os + ", " + phase + ", lookahead " + lookahead.toLowerCase() + "): ";
     if (sr > 0.0)
         text << juce::String(lat * 1000.0 / sr, 2) << " ms  (" << lat << " smp)";
     else
@@ -779,6 +780,19 @@ void SettingsPanel::buildAudio(Page& page)
         page.add(std::move(row), 56);
     }
     {
+        auto row =
+            std::make_unique<Row>("Transient lookahead",
+                                  "Lets the transient shaper react before the attack arrives. Adds the "
+                                  "same amount of latency.",
+                                  true);
+        row->setControl(std::make_unique<SegmentedSelector>(
+                            *apvts.getParameter(pid::lookahead),
+                            juce::StringArray{"Off", "1 ms", "2 ms", "5 ms"}, 0, "Transient lookahead",
+                            "Transient shaper lookahead, adds latency (saved with the project)"),
+                        250, 28);
+        page.add(std::move(row), 56);
+    }
+    {
         auto row = std::make_unique<Row>("Resulting latency", "Reported to the host and compensated.", false);
         auto label = std::make_unique<Styled<juce::Label>>();
         label->style = [](juce::Label& l, const Palette& p)
@@ -788,7 +802,7 @@ void SettingsPanel::buildAudio(Page& page)
         };
         label->setJustificationType(juce::Justification::centredRight);
         latencyLabel_ = label.get();
-        row->setControl(std::move(label), 330, 28);
+        row->setControl(std::move(label), 420, 28);
         page.add(std::move(row), 56);
     }
 }
@@ -940,6 +954,7 @@ juce::String SettingsPanel::buildDebugInfo(PentagritAudioProcessor& p)
               (p.getBlockSize() > 0 ? juce::String(p.getBlockSize()) : juce::String("not prepared")));
     lines.add("Oversampling: " + text(pid::oversampling) + ", " + text(pid::osPhase).toLowerCase() +
               " phase");
+    lines.add("Lookahead: " + text(pid::lookahead).toLowerCase());
     lines.add("Latency: " + juce::String(lat) + " samples" +
               (sr > 0.0 ? " (" + juce::String(lat * 1000.0 / sr, 2) + " ms)" : juce::String()));
     lines.add("Offline oversampling: " + text(pid::osRender).toLowerCase());

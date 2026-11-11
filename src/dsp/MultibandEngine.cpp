@@ -113,12 +113,14 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
         iir_[i]->initProcessing(static_cast<size_t>(maxBlock_));
     }
 
+    maxLookaheadBase_ = lookaheadSamples(kMaxLookaheadMs, sampleRate_);
+    lookaheadBase_ = 0;
     int maxLatency = 0;
     for (int f = 1; f <= maxFactor_; f *= 2)
         for (auto p : {OSPhase::linear, OSPhase::minimum})
             maxLatency = std::max(maxLatency, computeLatency(f, p));
     int ringSize = 64;
-    while (ringSize < maxLatency + 2)
+    while (ringSize < maxLatency + maxLookaheadBase_ + 2)
         ringSize <<= 1;
     delayLine_.setSize(numCh_, ringSize, false, true, false);
     delayMask_ = ringSize - 1;
@@ -131,9 +133,18 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
         b.setSize(numCh_, maxProc, false, true, false);
     ramp_.assign(static_cast<size_t>(maxProc), 1.0f);
 
+    const int maxProcDelay = maxLookaheadBase_ * maxFactor_;
+    int dryRing = 64;
+    while (dryRing < maxProcDelay + 2)
+        dryRing <<= 1;
+    dryDelayLine_.setSize(numCh_, dryRing, false, true, false);
+    dryDelayMask_ = dryRing - 1;
+    dryDelayPos_ = 0;
+    dryDelay_ = 0;
+
     crossover_.prepare(sampleRate_, sampleRate_, maxProc, numCh_);
     for (auto& b : bands_)
-        b.prepare(sampleRate_, maxProc, numCh_);
+        b.prepare(sampleRate_, maxProc, numCh_, maxProcDelay);
     autoGain_.prepare(sampleRate_, maxProc, numCh_);
 
     outGain_.reset(sampleRate_, kGainRampSec);
@@ -172,6 +183,8 @@ void MultibandEngine::resetCore() noexcept
     for (auto& b : bands_)
         b.reset();
     autoGain_.reset();
+    dryDelayLine_.clear();
+    dryDelayPos_ = 0;
 }
 
 MultibandEngine::Oversampler* MultibandEngine::activeOversampler() noexcept
@@ -200,15 +213,23 @@ void MultibandEngine::applyConfiguration() noexcept
     const int factor = std::min(effectiveFactor(requested, sampleRate_), maxFactor_);
     const int numBands = std::clamp(s.numBands, 2, kMaxBands);
 
-    if (!configured_ || factor != factor_ || s.osPhase != phase_)
+    const int lookahead = std::min(lookaheadSamples(s.lookaheadMs, sampleRate_), maxLookaheadBase_);
+
+    if (!configured_ || factor != factor_ || s.osPhase != phase_ || lookahead != lookaheadBase_)
     {
         factor_ = factor;
         phase_ = s.osPhase;
-        latency_ = computeLatency(factor_, phase_);
+        lookaheadBase_ = lookahead;
+        latency_ = computeLatency(factor_, phase_) + lookaheadBase_;
+        // Whole base-rate samples at the processing rate, so the reported latency is exact.
+        dryDelay_ = lookaheadBase_ * factor_;
         const double rate = sampleRate_ * factor_;
         crossover_.setProcessingRate(rate);
         for (auto& b : bands_)
+        {
             b.setProcessingRate(rate);
+            b.setLookahead(dryDelay_);
+        }
         autoGain_.setProcessingRate(rate);
         inGain_.reset(rate, kGainRampSec);
         mix_.reset(rate, kGainRampSec);
@@ -371,6 +392,24 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
     dry.copyFrom(work);
     crossover_.processAllpassChain(dry);
 
+    // Lookahead: delay the dry like the bands so mix and auto-gain compare aligned signals.
+    if (dryDelay_ > 0)
+    {
+        for (int ch = 0; ch < nc; ++ch)
+        {
+            float* d = dry.getChannelPointer(static_cast<size_t>(ch));
+            float* ring = dryDelayLine_.getWritePointer(ch);
+            int w = dryDelayPos_;
+            for (size_t i = 0; i < m; ++i)
+            {
+                ring[w & dryDelayMask_] = d[i];
+                d[i] = ring[(w - dryDelay_) & dryDelayMask_];
+                ++w;
+            }
+        }
+        dryDelayPos_ = (dryDelayPos_ + static_cast<int>(m)) & dryDelayMask_;
+    }
+
     applyGain(inGain_, ramp_, work);
 
     Crossover::BandBlocks blocks;
@@ -415,6 +454,13 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
             }
     }
     storePeak(meters_.outPeakDb, gainToDb(peakOf(base)));
+}
+
+int MultibandEngine::lookaheadSamples(float ms, double sampleRate) noexcept
+{
+    const double clamped = std::clamp(static_cast<double>(std::isfinite(ms) ? ms : 0.0f), 0.0,
+                                      static_cast<double>(kMaxLookaheadMs));
+    return static_cast<int>(std::lround(clamped * sampleRate / 1000.0));
 }
 
 int MultibandEngine::effectiveFactor(OSFactor requested, double sampleRate) noexcept
