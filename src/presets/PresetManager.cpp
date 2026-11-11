@@ -91,7 +91,7 @@ juce::String PresetManager::sanitiseName(const juce::String& name)
 
 bool PresetManager::isPresetParameter(const juce::String& id)
 {
-    return id != pid::osPhase && id != pid::osRender && id != pid::bypass;
+    return id != pid::osPhase && id != pid::osRender && id != pid::bypass && id != pid::lookahead;
 }
 
 juce::Result PresetManager::parsePreset(const juce::XmlElement& root, PresetEntry& meta, ParamValues& values)

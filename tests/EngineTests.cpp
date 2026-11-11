@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "TestSignals.h"
 #include "dsp/MultibandEngine.h"
+#include "params/Parameters.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
@@ -652,6 +653,8 @@ TEST_CASE("Fuzz: random parameters every block never produce NaN, Inf or huge pe
             s.os = kFactors[std::uniform_int_distribution<int>(0, 3)(gen)];
             s.osPhase = chance(0.5) ? OSPhase::minimum : OSPhase::linear;
             s.numBands = std::uniform_int_distribution<int>(2, 5)(gen);
+            s.lookaheadMs =
+                chance(0.5) ? 0.0f : kLookaheadMs[std::uniform_int_distribution<size_t>(1, 3)(gen)];
         }
         for (auto& x : s.xoverHz)
             x = std::exp(uni(std::log(20.0f), std::log(20000.0f)));

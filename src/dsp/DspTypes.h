@@ -47,6 +47,9 @@ struct EngineSettings
     // Offline-render oversampling: if osRenderSame, the live factor `os` is used; else `osRender`.
     OSFactor osRender = OSFactor::x1;
     bool osRenderSame = true;
+    // Transient shaper lookahead (ms): every band is delayed by this time (rounded to whole base-rate
+    // samples) while the detector sees the undelayed signal. Adds the same amount of latency. 0 = off.
+    float lookaheadMs = 0.0f;
     int numBands = 3;
     std::array<float, 4> xoverHz{120, 1200, 3500, 8000};
     std::array<BandSettings, kMaxBands> bands{};

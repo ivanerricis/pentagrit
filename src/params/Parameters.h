@@ -9,7 +9,10 @@
 
 namespace pentagrit
 {
-inline constexpr int kNumParameters = 14 + kMaxBands * kNumBandParams; // 64
+// Lookahead choices (pid::lookahead): Off, 1 ms, 2 ms, 5 ms.
+inline constexpr std::array<float, 4> kLookaheadMs{0.0f, 1.0f, 2.0f, 5.0f};
+
+inline constexpr int kNumParameters = 15 + kMaxBands * kNumBandParams; // 65
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -19,7 +22,7 @@ struct ParamRefs
     explicit ParamRefs(juce::AudioProcessorValueTreeState& apvts);
 
     std::atomic<float>*inGain, *outGain, *mix, *autoGain, *oversampling, *numBands, *bypass, *osPhase,
-        *osRender, *driveComp;
+        *osRender, *driveComp, *lookahead;
     std::array<std::atomic<float>*, 4> xover;
 
     struct Band

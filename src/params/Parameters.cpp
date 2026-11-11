@@ -145,6 +145,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         layout.add(boolParam(id(BandParam::bypass), prefix + "Bypass", false));
     }
 
+    // Appended last so the indices of the existing parameters do not move. Non-automatable and excluded from
+    // presets (like osPhase): changing it adds latency and resets the engine. Saved with the project.
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        makeID(pid::lookahead), "Lookahead", juce::StringArray{"Off", "1 ms", "2 ms", "5 ms"}, 0,
+        juce::AudioParameterChoiceAttributes().withAutomatable(false)));
+
     return layout;
 }
 
@@ -167,6 +173,7 @@ ParamRefs::ParamRefs(juce::AudioProcessorValueTreeState& apvts)
     osPhase = raw(pid::osPhase);
     osRender = raw(pid::osRender);
     driveComp = raw(pid::driveComp);
+    lookahead = raw(pid::lookahead);
     for (size_t i = 0; i < xover.size(); ++i)
         xover[i] = raw(pid::xover[i]);
 
@@ -205,6 +212,8 @@ EngineSettings ParamRefs::snapshot() const noexcept
         s.osRenderSame = (r == 0);
         s.osRender = static_cast<OSFactor>(r == 0 ? 0 : r); // 1..3 -> x2, x4, x8
     }
+    s.lookaheadMs = kLookaheadMs[static_cast<size_t>(
+        juce::jlimit(0, static_cast<int>(kLookaheadMs.size()) - 1, juce::roundToInt(ld(lookahead))))];
     s.numBands = juce::jlimit(2, kMaxBands, juce::roundToInt(ld(numBands)));
     for (size_t i = 0; i < xover.size(); ++i)
         s.xoverHz[i] = ld(xover[i]);

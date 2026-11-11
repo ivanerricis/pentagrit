@@ -246,6 +246,7 @@ TEST_CASE("Engine reconfiguration (factor, phase, band count) does not allocate"
         s.osPhase = (i / 4) % 2 == 0 ? OSPhase::linear : OSPhase::minimum;
         s.numBands = 2 + i % 4;
         s.bypass = (i % 7) == 0;
+        s.lookaheadMs = kLookaheadMs[static_cast<size_t>((i / 3) % 4)];
         engine.setNonRealtime((i % 5) == 0);
         {
             ScopedCounter counter;
@@ -255,4 +256,38 @@ TEST_CASE("Engine reconfiguration (factor, phase, band count) does not allocate"
         }
     }
     CHECK(total == 0);
+}
+
+TEST_CASE("Changing the lookahead at runtime does not allocate", "[allocation]")
+{
+    for (int osChoice : {0, 1, 3})
+    {
+        DYNAMIC_SECTION("oversampling choice " << osChoice)
+        {
+            PentagritAudioProcessor proc;
+            setParam(proc, pid::oversampling, static_cast<float>(osChoice) / 3.0f);
+            proc.setPlayConfigDetails(2, 2, 48000.0, 512);
+            proc.prepareToPlay(48000.0, 512);
+
+            juce::AudioBuffer<float> buffer(2, 512);
+            juce::MidiBuffer midi;
+            std::mt19937 gen(5);
+            std::uniform_real_distribution<float> noise(-0.5f, 0.5f);
+
+            std::size_t total = 0;
+            for (int i = 0; i < 40; ++i)
+            {
+                for (int c = 0; c < 2; ++c)
+                    for (int n = 0; n < 512; ++n)
+                        buffer.setSample(c, n, noise(gen));
+                setParam(proc, pid::lookahead, static_cast<float>((i / 2) % 4) / 3.0f);
+                {
+                    ScopedCounter counter;
+                    proc.processBlock(buffer, midi);
+                    total += ScopedCounter::count();
+                }
+            }
+            CHECK(total == 0);
+        }
+    }
 }

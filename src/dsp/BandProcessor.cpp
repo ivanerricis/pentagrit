@@ -9,10 +9,17 @@ namespace
 constexpr double kRampSeconds = 0.005;
 } // namespace
 
-void BandProcessor::prepare(double procRate, int maxBlock, int numCh)
+void BandProcessor::prepare(double procRate, int maxBlock, int numCh, int maxDelaySamples)
 {
     const auto n = static_cast<size_t>(std::max(maxBlock, 1));
     dry_.setSize(std::max(numCh, 1), static_cast<int>(n), false, true, false);
+    detector_.setSize(std::max(numCh, 1), static_cast<int>(n), false, true, false);
+    int ringSize = 64;
+    while (ringSize < std::max(maxDelaySamples, 0) + 2)
+        ringSize <<= 1;
+    delayLine_.setSize(std::max(numCh, 1), ringSize, false, true, false);
+    delayMask_ = ringSize - 1;
+    delay_ = 0;
     gainRamp_.assign(n, 1.0f);
     mixRamp_.assign(n, 1.0f);
     transient_.prepare(procRate, maxBlock, numCh);
@@ -31,8 +38,17 @@ void BandProcessor::setProcessingRate(double procRate) noexcept
     needSnap_ = true;
 }
 
+void BandProcessor::setLookahead(int delaySamples) noexcept
+{
+    delay_ = std::clamp(delaySamples, 0, delayMask_ - 1);
+    delayLine_.clear();
+    delayPos_ = 0;
+}
+
 void BandProcessor::reset() noexcept
 {
+    delayLine_.clear();
+    delayPos_ = 0;
     transient_.reset();
     saturator_.reset();
     gain_.setCurrentAndTargetValue(gain_.getTargetValue());
@@ -74,6 +90,29 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
         return;
     auto block = blockIn.getSubsetChannelBlock(0, static_cast<size_t>(nc));
 
+    // Lookahead: keep an undelayed copy for the detector, then delay the audio in place. This runs before the
+    // bypass handling, so bypassed, muted and neutral bands are delayed by the same amount.
+    const bool lookahead = delay_ > 0;
+    if (lookahead)
+    {
+        for (int ch = 0; ch < nc; ++ch)
+        {
+            float* d = block.getChannelPointer(static_cast<size_t>(ch));
+            float* det = detector_.getWritePointer(ch);
+            float* ring = delayLine_.getWritePointer(ch);
+            int w = delayPos_;
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = d[i];
+                det[i] = x;
+                ring[w & delayMask_] = x;
+                d[i] = ring[(w - delay_) & delayMask_];
+                ++w;
+            }
+        }
+        delayPos_ = (delayPos_ + n) & delayMask_;
+    }
+
     const bool bypassSettled = !wetMix_.isSmoothing() && wetMix_.getTargetValue() == 0.0f;
     if (bypassSettled)
     {
@@ -93,7 +132,11 @@ void BandProcessor::process(const juce::dsp::AudioBlock<float>& blockIn) noexcep
                 juce::FloatVectorOperations::copy(dry_.getWritePointer(ch),
                                                   block.getChannelPointer(static_cast<size_t>(ch)), n);
 
-        transient_.process(block);
+        if (lookahead)
+            transient_.process(
+                juce::dsp::AudioBlock<const float>(detector_).getSubBlock(0, static_cast<size_t>(n)), block);
+        else
+            transient_.process(block);
         saturator_.process(block);
 
         if (!mixConst1)

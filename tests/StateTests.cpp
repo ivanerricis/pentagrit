@@ -28,6 +28,7 @@ TEST_CASE("State round trip", "[state]")
     setValue(a, pid::xover[1], 750.0f);
     setValue(a, bandParamID(2, BandParam::satType), 4.0f);
     setValue(a, bandParamID(2, BandParam::mute), 1.0f);
+    setValue(a, pid::lookahead, 2.0f);
     a.setUiSize(1000, 640);
 
     juce::MemoryBlock block;
@@ -47,6 +48,7 @@ TEST_CASE("State round trip", "[state]")
     CHECK(raw(b, pid::xover[1]) == Approx(750.0f).epsilon(1e-3));
     CHECK(raw(b, bandParamID(2, BandParam::satType)) == Approx(4.0f));
     CHECK(raw(b, bandParamID(2, BandParam::mute)) == Approx(1.0f));
+    CHECK(raw(b, pid::lookahead) == Approx(2.0f));
     CHECK(b.getUiSize().x == 1000);
     CHECK(b.getUiSize().y == 640);
 }
