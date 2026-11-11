@@ -108,18 +108,6 @@ jobs:
         run: |
           exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
           xvfb-run -a "$exe" '~[allocation]'
-      - name: Attribute JUCE assertions to test cases (diagnostic)
-        if: always()
-        run: |
-          exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
-          cat > run_each.sh <<'SH'
-          exe="$1"
-          "$exe" --list-tests --verbosity quiet '~[allocation]' | sed '/^$/d' | while IFS= read -r t; do
-            out="$("$exe" "$t" 2>&1)" || echo "FAILED: $t"
-            echo "$out" | grep -E 'JUCE Assertion|runtime error|Sanitizer|Leaked objects' | sed "s|^|[$t] |"
-          done
-          SH
-          xvfb-run -a bash run_each.sh "$exe"
 
   # Windows + Linux always.
   build:
