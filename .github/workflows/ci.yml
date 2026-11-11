@@ -59,10 +59,15 @@ jobs:
             libxinerama-dev libxrandr-dev libxrender-dev libglu1-mesa-dev mesa-common-dev
       - name: Configure (compile_commands.json)
         run: cmake --preset ci-linux -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPENTAGRIT_BUILD_TESTS=OFF
+      - name: Generate binary data headers
+        # PentagritUiData.h / PentagritPresetData.h come from juce_add_binary_data targets.
+        run: cmake --build build/ci-linux --target PentagritUiAssets PentagritPresetData
       - name: clang-tidy
+        # Header filter anchored to this repo's src/ so .cpm and build/ headers are excluded.
         run: |
           git ls-files 'src/*.cpp' \
-            | xargs --no-run-if-empty clang-tidy-18 -p build/ci-linux --quiet
+            | xargs --no-run-if-empty clang-tidy-18 -p build/ci-linux --quiet \
+                --header-filter="^${GITHUB_WORKSPACE}/src/.*"
 
   # AddressSanitizer + UndefinedBehaviorSanitizer on a Debug build (JUCE jasserts active).
   sanitizers:
@@ -103,6 +108,18 @@ jobs:
         run: |
           exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
           xvfb-run -a "$exe" '~[allocation]'
+      - name: Attribute JUCE assertions to test cases (diagnostic)
+        if: always()
+        run: |
+          exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
+          cat > run_each.sh <<'SH'
+          exe="$1"
+          "$exe" --list-test-names-only '~[allocation]' | sed '/^$/d' | while IFS= read -r t; do
+            out="$("$exe" "$t" 2>&1)" || echo "FAILED: $t"
+            echo "$out" | grep -E 'JUCE Assertion|runtime error|Sanitizer|Leaked objects' | sed "s|^|[$t] |"
+          done
+          SH
+          xvfb-run -a bash run_each.sh "$exe"
 
   # Windows + Linux always.
   build:
