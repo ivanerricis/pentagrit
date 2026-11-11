@@ -150,3 +150,83 @@ TEST_CASE("snapshot() maps the render oversampling choice", "[parameters]")
     setChoice(pid::osRender, 2.0f);
     CHECK(refs.snapshot().osRender == OSFactor::x4);
 }
+
+TEST_CASE("Typed text converts to parameter values", "[parameters]")
+{
+    PentagritAudioProcessor proc;
+    auto& apvts = proc.getAPVTS();
+    auto valueFor = [&apvts](const juce::String& id, const juce::String& text)
+    {
+        auto* p = apvts.getParameter(id);
+        return p->convertFrom0to1(p->getValueForText(text));
+    };
+
+    SECTION("percent")
+    {
+        for (auto* t : {"50 %", "50", "50%", " 50 % "})
+            CHECK(valueFor(pid::mix, t) == Approx(0.5f));
+        CHECK(valueFor(pid::mix, "0 %") == Approx(0.0f).margin(1e-6f));
+        CHECK(valueFor(bandParamID(1, BandParam::speed), "100 %") == Approx(1.0f));
+    }
+    SECTION("frequency")
+    {
+        CHECK(valueFor(pid::xover[1], "1.2 kHz") == Approx(1200.0f).epsilon(1e-3));
+        CHECK(valueFor(pid::xover[1], "1.2k") == Approx(1200.0f).epsilon(1e-3));
+        CHECK(valueFor(pid::xover[1], "800 Hz") == Approx(800.0f).epsilon(1e-3));
+        CHECK(valueFor(pid::xover[1], "800") == Approx(800.0f).epsilon(1e-3));
+    }
+    SECTION("decibels")
+    {
+        CHECK(valueFor(pid::inGain, "-3 dB") == Approx(-3.0f).margin(0.05f));
+        CHECK(valueFor(pid::inGain, "-3") == Approx(-3.0f).margin(0.05f));
+        CHECK(valueFor(bandParamID(0, BandParam::drive), "12.5 dB") == Approx(12.5f).margin(0.05f));
+    }
+}
+
+TEST_CASE("Text round trip returns the displayed value", "[parameters]")
+{
+    PentagritAudioProcessor proc;
+    auto& apvts = proc.getAPVTS();
+
+    auto roundTrip = [&apvts](const juce::String& id, float norm)
+    {
+        auto* p = apvts.getParameter(id);
+        const auto shown = p->getText(norm, 0);
+        const float back = p->convertFrom0to1(p->getValueForText(shown));
+        const float again = p->convertFrom0to1(p->getValueForText(p->getText(p->convertTo0to1(back), 0)));
+        return std::make_pair(back, again);
+    };
+
+    for (int i = 0; i <= 20; ++i)
+    {
+        const float norm = static_cast<float>(i) / 20.0f;
+        {
+            auto* p = apvts.getParameter(pid::mix);
+            const auto [back, again] = roundTrip(pid::mix, norm);
+            CHECK(back == Approx(p->convertFrom0to1(norm)).margin(0.005f));
+            CHECK(again == Approx(back));
+        }
+        {
+            auto* p = apvts.getParameter(pid::inGain);
+            const auto [back, again] = roundTrip(pid::inGain, norm);
+            CHECK(back == Approx(p->convertFrom0to1(norm)).margin(0.05f));
+            CHECK(again == Approx(back).margin(1e-4f));
+        }
+        {
+            auto* p = apvts.getParameter(pid::xover[0]);
+            const auto [back, again] = roundTrip(pid::xover[0], norm);
+            const float orig = p->convertFrom0to1(norm);
+            // Display precision: whole Hz below 1 kHz, 10 Hz steps above.
+            CHECK(back == Approx(orig).epsilon(orig < 1000.0f ? 0.03 : 0.006));
+            CHECK(again == Approx(back).epsilon(1e-3));
+        }
+    }
+}
+
+TEST_CASE("Structural parameters are not automatable", "[parameters]")
+{
+    PentagritAudioProcessor proc;
+    CHECK_FALSE(proc.getAPVTS().getParameter(pid::oversampling)->isAutomatable());
+    CHECK_FALSE(proc.getAPVTS().getParameter(pid::numBands)->isAutomatable());
+    CHECK(proc.getAPVTS().getParameter(pid::inGain)->isAutomatable());
+}
