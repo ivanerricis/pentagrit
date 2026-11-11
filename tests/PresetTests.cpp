@@ -299,6 +299,30 @@ TEST_CASE("Preset stateVersion handling", "[Preset]")
     CHECK(f.pm.getUserPresets().empty());
 }
 
+TEST_CASE("Drive compensation is a normal preset parameter", "[Preset]")
+{
+    Fixture f;
+    f.set(pid::driveComp, 1.0f);
+    REQUIRE(f.pm.saveAs("Comp", "Mine").wasOk());
+    f.set(pid::driveComp, 0.0f);
+
+    auto user = f.pm.getUserPresets();
+    REQUIRE(user.size() == 1);
+    REQUIRE(f.pm.loadPreset(user[0]).wasOk());
+    CHECK(f.get(pid::driveComp) == Approx(1.0f));
+
+    // Presets that predate the parameter (all factory presets, older user presets) switch it off.
+    REQUIRE(f.pm.loadInit().wasOk());
+    CHECK(f.get(pid::driveComp) == Approx(0.0f).margin(1e-5f));
+    f.set(pid::driveComp, 1.0f);
+    for (const auto& e : f.pm.getFactoryPresets())
+    {
+        REQUIRE(f.pm.loadPreset(e).wasOk());
+        CHECK(f.get(pid::driveComp) == Approx(0.0f).margin(1e-5f));
+        f.set(pid::driveComp, 1.0f);
+    }
+}
+
 TEST_CASE("Preset values are clamped and missing parameters use defaults", "[Preset]")
 {
     Fixture f;

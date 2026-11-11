@@ -17,7 +17,7 @@ namespace pid
 {
 inline constexpr const char *inGain = "inGain", *outGain = "outGain", *mix = "mix", *autoGain = "autoGain",
                             *oversampling = "oversampling", *numBands = "numBands", *bypass = "bypass",
-                            *osPhase = "osPhase", *osRender = "osRender";
+                            *osPhase = "osPhase", *osRender = "osRender", *driveComp = "driveComp";
 inline constexpr std::array<const char*, 4> xover{"xover1", "xover2", "xover3", "xover4"};
 } // namespace pid
 

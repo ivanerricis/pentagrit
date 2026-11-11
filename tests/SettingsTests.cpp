@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "settings/SettingsManager.h"
 #include "ui/SettingsPanel.h"
+#include "update/UpdateChecker.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <set>
@@ -17,8 +18,24 @@ namespace
     SettingsManager::setTestOverrides(juce::File::getSpecialLocation(juce::File::tempDirectory)
                                           .getChildFile("pentagrit_tests_unused_settings.settings"),
                                       true, true);
+    SettingsManager::setUpdateFetcherOverride(
+        []
+        {
+            update::FetchOutcome o; // the suite never touches the network
+            o.error = "network disabled in tests";
+            return o;
+        });
     return true;
 }();
+
+// An absolute path on every platform (a drive-letter path is relative on Linux and macOS).
+juce::String absolutePathForTest()
+{
+    return juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("pentagrit_test_presets")
+        .getChildFile("some where")
+        .getFullPathName();
+}
 
 struct TempFile
 {
@@ -87,7 +104,13 @@ TEST_CASE("Settings defaults", "[settings]")
     CHECK_FALSE(s.checkUpdates); // opt-in
     CHECK(m.getEffectivePresetFolder() == PresetManager::getDefaultUserFolder());
     CHECK(m.loadedOk());
+    CHECK(s.lastUpdateCheckMs == 0);
+    // The update check needs the native HTTP client: Windows and macOS only (no libcurl on Linux).
+#if JUCE_WINDOWS || JUCE_MAC
+    CHECK(SettingsManager::kUpdateCheckAvailable);
+#else
     CHECK_FALSE(SettingsManager::kUpdateCheckAvailable);
+#endif
 }
 
 TEST_CASE("Settings default file location", "[settings]")
@@ -118,11 +141,12 @@ TEST_CASE("Settings round trip", "[settings]")
         s.meterRelease = 35.0f;
         s.meterRefreshHz = 60;
         s.showCpu = false;
-        s.presetFolder = "C:/some/where";
+        s.presetFolder = absolutePathForTest();
         s.startupMode = StartupMode::specific;
         s.startup = {"Punchy Kick", "Drums", true};
         s.lastPreset = {"My Preset", "Unsorted", false};
         s.checkUpdates = true;
+        s.lastUpdateCheckMs = 1'700'000'123'456LL;
         m.set(s);
     }
     REQUIRE(tmp.file.existsAsFile());
@@ -139,12 +163,15 @@ TEST_CASE("Settings round trip", "[settings]")
     CHECK(s.meterRelease == Catch::Approx(35.0f));
     CHECK(s.meterRefreshHz == 60);
     CHECK_FALSE(s.showCpu);
-    CHECK(s.presetFolder == "C:/some/where");
+    CHECK(s.presetFolder == absolutePathForTest());
+    CHECK(juce::File::isAbsolutePath(s.presetFolder));
     CHECK(s.startupMode == StartupMode::specific);
     CHECK(s.startup == PresetRef{"Punchy Kick", "Drums", true});
     CHECK(s.lastPreset == PresetRef{"My Preset", "Unsorted", false});
     CHECK(s.checkUpdates);
-    CHECK(m.getEffectivePresetFolder() == juce::File("C:/some/where"));
+    CHECK(s.lastUpdateCheckMs == 1'700'000'123'456LL);
+    CHECK(m.getEffectivePresetFolder() == juce::File(absolutePathForTest()));
+    CHECK(m.getEffectivePresetFolder().getFileName() == "some where");
 }
 
 TEST_CASE("Settings corrupt or missing file is tolerated", "[settings]")
@@ -204,7 +231,7 @@ TEST_CASE("Settings reset keeps the last preset", "[settings]")
     auto s = m.get();
     s.zoomPercent = 200;
     s.checkUpdates = true;
-    s.presetFolder = "X:/y";
+    s.presetFolder = absolutePathForTest();
     s.lastPreset = {"Kept", "Cat", false};
     m.set(s);
 

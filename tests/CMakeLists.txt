@@ -15,6 +15,7 @@ add_executable(PentagritTests
   UndoTests.cpp
   PresetTests.cpp
   SettingsTests.cpp
+  UpdateTests.cpp
   PerfTests.cpp)
 
 target_link_libraries(PentagritTests PRIVATE PentagritCore Catch2::Catch2)

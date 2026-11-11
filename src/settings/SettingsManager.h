@@ -3,6 +3,7 @@
 
 #include "presets/PresetManager.h"
 #include "ui/UiOptions.h"
+#include "update/UpdateChecker.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <memory>
 
@@ -47,7 +48,8 @@ struct UserSettings
     StartupMode startupMode = StartupMode::last;
     PresetRef startup; // used when startupMode == specific
     PresetRef lastPreset;
-    bool checkUpdates = false; // opt-in, off by default
+    bool checkUpdates = false;         // opt-in, off by default
+    juce::int64 lastUpdateCheckMs = 0; // time (ms since epoch) of the last automatic check; 0 = never
 
     static constexpr int kInfiniteHold = 99999;
 };
@@ -59,8 +61,27 @@ struct UserSettings
 class SettingsManager final : public juce::ChangeBroadcaster
 {
 public:
-    // The update check needs the public GitHub Releases API: unavailable while the repository is private.
+    // The update check uses JUCE's native HTTP client (WinINet / NSURLSession), which exists on Windows and
+    // macOS only: JUCE_USE_CURL stays 0, so on Linux there is no HTTP backend (the About page then just opens
+    // the releases page in the browser).
+#if JUCE_WINDOWS || JUCE_MAC
+    static constexpr bool kUpdateCheckAvailable = true;
+#else
     static constexpr bool kUpdateCheckAvailable = false;
+#endif
+
+    // State of the last update check of this process (shared by every plugin instance).
+    struct UpdateState
+    {
+        enum class Phase
+        {
+            idle, // no check done yet
+            checking,
+            done // `result` is valid
+        };
+        Phase phase = Phase::idle;
+        update::UpdateResult result;
+    };
 
     SettingsManager(); // default file
     explicit SettingsManager(const juce::File& file);
@@ -91,6 +112,20 @@ public:
     juce::File getEffectivePresetFolder() const;
     static juce::File getEffectivePresetFolder(const UserSettings& s);
 
+    // Update check (Windows / macOS; no-op elsewhere). Never blocks: the request runs on a background thread
+    // and the state changes on the message thread, announced by updateChanges().
+    // Automatic check: does nothing unless the user opted in (`checkUpdates`) and a day has passed since the
+    // last one (stored in the settings file). Call it once when an editor opens.
+    void checkForUpdatesIfDue();
+    // Always checks (the "Check now" button), whatever the opt-in. Returns false when one is already running
+    // or the platform has no HTTP backend.
+    bool checkForUpdatesNow();
+    const UpdateState& getUpdateState() const noexcept { return updateState_; }
+    juce::ChangeBroadcaster& updateChanges() noexcept { return updateChanges_; }
+    // Tests only: replaces the network request of every SettingsManager created afterwards, and makes
+    // checkForUpdates* work on every platform. Pass an empty function to restore the real request.
+    static void setUpdateFetcherOverride(update::Fetcher fetcher);
+
     // Applies the startup preset policy. Returns true when a preset was loaded. Does nothing (false) when the
     // preset cannot be found (e.g. "last" without history, or a deleted user preset).
     static bool applyStartupPreset(const UserSettings& s, PresetManager& presets);
@@ -101,6 +136,7 @@ private:
     void readFromProperties();
     void writeToProperties();
     static UserSettings sanitised(UserSettings s);
+    bool startUpdateCheck();
 
     juce::File file_;
     std::unique_ptr<juce::InterProcessLock> lock_;
@@ -108,6 +144,9 @@ private:
     UserSettings data_;
     juce::Time lastModified_;
     bool loadedOk_ = true;
+    UpdateState updateState_;
+    juce::ChangeBroadcaster updateChanges_;
+    update::UpdateChecker updateChecker_; // last member: its thread is joined first on destruction
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsManager)
 };
