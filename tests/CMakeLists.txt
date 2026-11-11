@@ -12,6 +12,7 @@ add_executable(PentagritTests
   StateTests.cpp
   AllocationTests.cpp
   EditorTests.cpp
+  UndoTests.cpp
   PresetTests.cpp
   SettingsTests.cpp
   UpdateTests.cpp

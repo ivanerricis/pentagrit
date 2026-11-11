@@ -8,6 +8,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <atomic>
+#include <memory>
 
 namespace pentagrit
 {
@@ -54,6 +55,30 @@ public:
     // Per-user settings, shared by all instances of the process.
     SettingsManager& getSettings() noexcept { return *settings_; }
 
+    // Undo history of the changes made from the plugin UI (MESSAGE THREAD ONLY; the audio thread never
+    // touches it). One transaction per UI gesture: a knob drag, a typed value, a toggle click, a crossover
+    // handle drag or a selector change (with the crossover handles it moves). Host automation is not
+    // recorded. Loading a preset, switching A/B and restoring a host state clear it.
+    juce::UndoManager& getUndoManager() noexcept { return undoManager_; }
+    void clearUndoHistory();
+    // True while a UI gesture is in progress (between beginChangeGesture and endChangeGesture).
+    bool isUiGestureOpen() const noexcept;
+    // While alive, gestures are not recorded: for changes the editor makes as a side effect of a host change.
+    class ScopedUndoPause
+    {
+    public:
+        explicit ScopedUndoPause(PentagritAudioProcessor& p) : p_(p) { ++p_.undoPause_; }
+        ~ScopedUndoPause() { --p_.undoPause_; }
+        ScopedUndoPause(const ScopedUndoPause&) = delete;
+        ScopedUndoPause& operator=(const ScopedUndoPause&) = delete;
+
+    private:
+        PentagritAudioProcessor& p_;
+    };
+    // History bound: about this many single-parameter steps are kept.
+    static constexpr int kUndoMaxUnits = 200;
+    static constexpr int kUndoMinTransactions = 50;
+
     // Editor size, persisted in the plugin state.
     juce::Point<int> getUiSize() const;
     void setUiSize(int width, int height);
@@ -65,6 +90,9 @@ private:
     // Single place for state migrations; called with the version found in the saved state.
     static void migrateState(juce::ValueTree& state, int fromVersion);
 
+    class UndoRecorder;
+
+    juce::UndoManager undoManager_{kUndoMaxUnits, kUndoMinTransactions}; // outlives apvts_ and the recorder
     juce::AudioProcessorValueTreeState apvts_;
     ParamRefs params_;
     MultibandEngine engine_;
@@ -72,6 +100,9 @@ private:
     juce::SharedResourcePointer<SettingsManager> settings_;
     double currentSampleRate_ = 0.0;
     std::atomic<int> pendingLatency_{0};
+    std::atomic<bool> pendingUndoClear_{false};
+    int undoPause_ = 0;                          // message thread
+    std::unique_ptr<UndoRecorder> undoRecorder_; // last: destroyed first
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PentagritAudioProcessor)
 };

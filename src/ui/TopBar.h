@@ -6,6 +6,23 @@
 
 namespace pentagrit::ui
 {
+// Small icon button (undo / redo arrows) drawn with the theme palette. Greyed out when disabled.
+class HistoryButton final : public juce::Button
+{
+public:
+    enum class Kind
+    {
+        undo,
+        redo
+    };
+    HistoryButton(Kind kind, const juce::String& name);
+    void paintButton(juce::Graphics&, bool highlighted, bool down) override;
+    Kind kind() const noexcept { return kind_; }
+
+private:
+    Kind kind_;
+};
+
 // Top bar: logo, [preset slot for WP8's PresetBar], bands selector, oversampling selector, latency readout,
 // AUTO-GAIN, BYPASS and the settings gear.
 class TopBar final : public juce::Component
@@ -19,6 +36,13 @@ public:
     // WP9: set this to open the settings panel. The gear is also reachable as `settingsButton()`.
     std::function<void()> onSettingsClicked;
     juce::ToggleButton& settingsButton() noexcept { return gear_; }
+
+    // Undo / redo buttons (right of the preset bar). The owner performs the action and keeps the enabled
+    // state in sync with the history through setHistoryState().
+    std::function<void()> onUndo, onRedo;
+    void setHistoryState(bool canUndo, bool canRedo);
+    HistoryButton& undoButton() noexcept { return undo_; }
+    HistoryButton& redoButton() noexcept { return redo_; }
 
     void applyTheme();
     void tick();
@@ -34,6 +58,7 @@ private:
     MeterState& meters_;
     std::function<double()> sampleRate_;
     SlotComponent presetSlot_;
+    HistoryButton undo_{HistoryButton::Kind::undo, "Undo"}, redo_{HistoryButton::Kind::redo, "Redo"};
     SegmentedSelector bands_, os_;
     juce::ToggleButton autoGain_{"AUTO-GAIN"}, bypass_{"BYPASS"}, gear_;
     std::unique_ptr<juce::ButtonParameterAttachment> autoGainAtt_, bypassAtt_;

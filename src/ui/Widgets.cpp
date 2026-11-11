@@ -75,6 +75,8 @@ void KnobSlider::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelD
         return;
     const double dir = (w.deltaY > 0.0f ? 1.0 : -1.0) * (w.isReversed ? -1.0 : 1.0);
     const double p = juce::jlimit(0.0, 1.0, valueToProportionOfLength(getValue()) + dir * 0.02);
+    // One gesture (and so one undo step) per wheel notch.
+    juce::Slider::ScopedDragNotification drag(*this);
     setValue(proportionOfLengthToValue(p), juce::sendNotificationSync);
 }
 
@@ -187,6 +189,8 @@ void LabelledKnob::beginTyping()
 
 void LabelledKnob::commitText(const juce::String& text)
 {
+    // A complete gesture: one undo step, and the host sees the edit as an automation gesture.
+    juce::Slider::ScopedDragNotification drag(slider_);
     slider_.setValue(juce::jlimit(slider_.getMinimum(), slider_.getMaximum(), parse(text)),
                      juce::sendNotificationSync);
 }

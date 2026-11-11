@@ -4,6 +4,8 @@
 #include "PluginEditor.h"
 #include "PluginInfo.h"
 
+#include <vector>
+
 namespace pentagrit
 {
 namespace
@@ -11,7 +13,108 @@ namespace
 const juce::Identifier kStateVersionProp{"stateVersion"};
 const juce::Identifier kUiWidthProp{"uiWidth"};
 const juce::Identifier kUiHeightProp{"uiHeight"};
+
+// One recorded parameter change. perform() runs when the step is recorded (the parameter already has the new
+// value, so it does nothing) and on redo; undo() restores the old value. Values are normalised.
+class ParameterChangeAction final : public juce::UndoableAction
+{
+public:
+    ParameterChangeAction(juce::AudioProcessorParameter& p, float oldValue, float newValue)
+        : param_(p), old_(oldValue), new_(newValue)
+    {
+    }
+    bool perform() override { return apply(new_); }
+    bool undo() override { return apply(old_); }
+    int getSizeInUnits() override { return 1; }
+
+private:
+    bool apply(float value)
+    {
+        if (!juce::approximatelyEqual(param_.getValue(), value))
+        {
+            // A gesture, so that the host sees the change like any other edit made from the UI.
+            param_.beginChangeGesture();
+            param_.setValueNotifyingHost(value);
+            param_.endChangeGesture();
+        }
+        return true;
+    }
+
+    juce::AudioProcessorParameter& param_;
+    float old_, new_;
+};
 } // namespace
+
+// Records the parameter gestures of the plugin UI as undo steps.
+//
+// Why not the UndoManager of the AudioProcessorValueTreeState? The APVTS copies parameter values into its
+// tree from a timer (every 20 to 500 ms) and records every copy in its UndoManager, whatever caused the
+// change: host automation would flood the history, and a UI change could not be told apart from automation at
+// that point. Instead every UI edit already runs inside beginChangeGesture()/endChangeGesture() (the JUCE
+// attachments do that, so do the crossover handles, the selectors and the typed values), while the host never
+// calls them on our listeners. A parameter listener therefore sees exactly the UI edits: the value at the
+// start and at the end of a gesture become one step. Gestures nested in another one (the band selector moving
+// crossover handles) join the step of the outermost gesture.
+class PentagritAudioProcessor::UndoRecorder final : private juce::AudioProcessorParameter::Listener
+{
+public:
+    UndoRecorder(PentagritAudioProcessor& processor, juce::UndoManager& um) : processor_(processor), um_(um)
+    {
+        const auto n = static_cast<size_t>(processor_.getParameters().size());
+        start_.assign(n, 0.0f);
+        open_.assign(n, false);
+        for (auto* p : processor_.getParameters())
+            p->addListener(this);
+    }
+
+    ~UndoRecorder() override
+    {
+        for (auto* p : processor_.getParameters())
+            p->removeListener(this);
+    }
+
+    bool isGestureOpen() const noexcept { return depth_ > 0; }
+
+private:
+    void parameterValueChanged(int, float) override {}
+
+    void parameterGestureChanged(int index, bool starting) override
+    {
+        // Message thread only; undo/redo and the state restore do not record themselves.
+        if (!juce::MessageManager::getInstance()->isThisTheMessageThread() || um_.isPerformingUndoRedo() ||
+            index < 0 || static_cast<size_t>(index) >= open_.size())
+            return;
+        const auto i = static_cast<size_t>(index);
+        auto* param = processor_.getParameters()[index];
+
+        if (starting)
+        {
+            if (open_[i] || processor_.undoPause_ > 0)
+                return;
+            if (depth_ == 0)
+                um_.beginNewTransaction(param->getName(64));
+            open_[i] = true;
+            start_[i] = param->getValue();
+            ++depth_;
+        }
+        else
+        {
+            if (!open_[i])
+                return;
+            open_[i] = false;
+            --depth_;
+            const float now = param->getValue();
+            if (!juce::approximatelyEqual(start_[i], now))
+                um_.perform(new ParameterChangeAction(*param, start_[i], now));
+        }
+    }
+
+    PentagritAudioProcessor& processor_;
+    juce::UndoManager& um_;
+    std::vector<float> start_;
+    std::vector<bool> open_;
+    int depth_ = 0;
+};
 
 PentagritAudioProcessor::PentagritAudioProcessor()
     : AudioProcessor(BusesProperties()
@@ -20,6 +123,11 @@ PentagritAudioProcessor::PentagritAudioProcessor()
       apvts_(*this, nullptr, juce::Identifier(kStateTag), createParameterLayout()), params_(apvts_),
       presetManager_(apvts_)
 {
+    // The APVTS gets no UndoManager on purpose, see UndoRecorder.
+    undoRecorder_ = std::make_unique<UndoRecorder>(*this, undoManager_);
+    presetManager_.setOnStateReplaced(
+        [this] { clearUndoHistory(); }); // presets and A/B replace the state: history cleared
+
     // The user preset folder and the startup preset come from the per-user settings. A host that restores a
     // saved state calls setStateInformation() afterwards, which replaces the whole state (including the
     // preset), so the startup preset never overrides a restored session.
@@ -38,6 +146,21 @@ PentagritAudioProcessor::~PentagritAudioProcessor()
     stopTimer();
     presetManager_.removeChangeListener(this);
     settings_->removeChangeListener(this);
+}
+
+void PentagritAudioProcessor::clearUndoHistory()
+{
+    // Some hosts restore the state from another thread: the UndoManager is only touched on the message thread
+    // (the timer below picks the request up).
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+        undoManager_.clearUndoHistory();
+    else
+        pendingUndoClear_.store(true, std::memory_order_release);
+}
+
+bool PentagritAudioProcessor::isUiGestureOpen() const noexcept
+{
+    return undoRecorder_ != nullptr && undoRecorder_->isGestureOpen();
 }
 
 void PentagritAudioProcessor::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -71,6 +194,8 @@ void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 
 void PentagritAudioProcessor::timerCallback()
 {
+    if (pendingUndoClear_.exchange(false, std::memory_order_acq_rel))
+        undoManager_.clearUndoHistory();
     const int latency = pendingLatency_.load(std::memory_order_relaxed);
     if (latency != getLatencySamples())
         setLatencySamples(latency);
@@ -152,6 +277,7 @@ void PentagritAudioProcessor::setStateInformation(const void* data, int sizeInBy
 
     migrateState(tree, version);
     apvts_.replaceState(tree);
+    clearUndoHistory(); // the whole state was replaced: older steps no longer apply
 }
 
 void PentagritAudioProcessor::migrateState(juce::ValueTree&, int)

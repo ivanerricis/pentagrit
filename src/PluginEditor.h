@@ -49,6 +49,11 @@ public:
     ui::SettingsPanel* getSettingsPanel() noexcept { return settingsPanel_.get(); }
     PresetBar* getPresetBar() noexcept { return presetBar_.get(); }
 
+    // Undo / redo of the parameter changes made from the UI (the top bar buttons and Ctrl/Cmd+Z,
+    // Ctrl/Cmd+Shift+Z, Ctrl+Y call these). Return false when there was nothing to undo / redo.
+    bool undo();
+    bool redo();
+
     // Inspection (tests).
     int numBands() const noexcept { return numBands_; }
     bool isCompact() const noexcept { return options_.layout == ui::Layout::compact; }
@@ -61,6 +66,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseEnter(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
+    bool keyPressed(const juce::KeyPress&) override;
 
 private:
     // Holds the whole UI at the base size; scaled by a transform.
@@ -83,6 +89,7 @@ private:
     void applyThemeToChildren();
     int baseHeight() const noexcept { return isCompact() ? ui::kCompactHeight : ui::kFullHeight; }
     void updateConstraints();
+    void updateHistoryButtons();
 
     PentagritAudioProcessor& processor_;
     ui::PentagritLookAndFeel lnf_;
