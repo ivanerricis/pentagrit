@@ -64,6 +64,46 @@ jobs:
           git ls-files 'src/*.cpp' \
             | xargs --no-run-if-empty clang-tidy-18 -p build/ci-linux --quiet
 
+  # AddressSanitizer + UndefinedBehaviorSanitizer on a Debug build (JUCE jasserts active).
+  sanitizers:
+    name: asan-ubsan (advisory)
+    # Advisory for now: remove continue-on-error and make it a required check once it is clean.
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 60
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: linux-asan
+          max-size: 500M
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: cpm-asan-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: cpm-asan-
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build             libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev libfreetype-dev             libfontconfig1-dev libx11-dev libxcomposite-dev libxcursor-dev libxext-dev             libxinerama-dev libxrandr-dev libxrender-dev libglu1-mesa-dev mesa-common-dev xvfb
+      - name: Configure
+        run: |
+          cmake --preset ci-linux-asan             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build --preset ci-linux-asan --parallel
+      - name: Test (ASan + UBSan)
+        # [allocation] tests are excluded: AllocationTests.cpp replaces global operator new/delete
+        # to count allocations, which conflicts with ASan's allocator interception.
+        # The test binary is run directly because ctest cannot filter on Catch2 tags.
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=0
+        run: |
+          exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
+          xvfb-run -a "$exe" '~[allocation]'
+
   # Windows + Linux always.
   build:
     name: build

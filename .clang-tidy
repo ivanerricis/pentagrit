@@ -7,4 +7,5 @@ Checks: >
   modernize-use-nullptr,
   readability-braces-around-statements
 WarningsAsErrors: ''
-HeaderFilterRegex: 'src/.*'
+# Project headers only; CI also passes an absolute --header-filter so .cpm/ and build/ never match.
+HeaderFilterRegex: '^.*/pentagrit/src/.*'
