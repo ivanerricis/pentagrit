@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "settings/SettingsManager.h"
 
+#include "PluginInfo.h"
 #include <cmath>
 
 namespace pentagrit
@@ -12,6 +13,7 @@ struct Overrides
     juce::File file;
     bool readOnly = false;
     bool ignoreLastPreset = false;
+    update::Fetcher updateFetcher; // empty = the real request
 };
 
 Overrides& overrides()
@@ -40,6 +42,13 @@ constexpr const char* kLastName = "lastPresetName";
 constexpr const char* kLastCategory = "lastPresetCategory";
 constexpr const char* kLastFactory = "lastPresetFactory";
 constexpr const char* kCheckUpdates = "checkUpdates";
+constexpr const char* kLastUpdateCheck = "lastUpdateCheck";
+
+// The real request exists on Windows / macOS; tests may inject a fetcher on any platform.
+bool updatesSupported()
+{
+    return SettingsManager::kUpdateCheckAvailable || static_cast<bool>(overrides().updateFetcher);
+}
 
 int nearestOf(int v, std::initializer_list<int> allowed, int fallback)
 {
@@ -63,7 +72,15 @@ juce::File SettingsManager::getDefaultFile()
 
 void SettingsManager::setTestOverrides(const juce::File& file, bool readOnly, bool ignoreLastPreset)
 {
-    overrides() = {file, readOnly, ignoreLastPreset};
+    auto& o = overrides();
+    o.file = file;
+    o.readOnly = readOnly;
+    o.ignoreLastPreset = ignoreLastPreset;
+}
+
+void SettingsManager::setUpdateFetcherOverride(update::Fetcher fetcher)
+{
+    overrides().updateFetcher = std::move(fetcher);
 }
 
 void SettingsManager::setIgnoreLastPreset(bool ignore)
@@ -73,11 +90,15 @@ void SettingsManager::setIgnoreLastPreset(bool ignore)
 
 SettingsManager::SettingsManager()
 {
+    if (overrides().updateFetcher)
+        updateChecker_.setFetcher(overrides().updateFetcher);
     init(getDefaultFile(), overrides().readOnly);
 }
 
 SettingsManager::SettingsManager(const juce::File& file)
 {
+    if (overrides().updateFetcher)
+        updateChecker_.setFetcher(overrides().updateFetcher);
     init(file, false);
 }
 
@@ -153,6 +174,7 @@ void SettingsManager::readFromProperties()
     s.lastPreset = {p.getValue(kLastName, {}), p.getValue(kLastCategory, {}),
                     p.getBoolValue(kLastFactory, true)};
     s.checkUpdates = p.getBoolValue(kCheckUpdates, false);
+    s.lastUpdateCheckMs = juce::jmax<juce::int64>(0, p.getValue(kLastUpdateCheck, "0").getLargeIntValue());
     data_ = sanitised(s);
 }
 
@@ -182,6 +204,7 @@ void SettingsManager::writeToProperties()
     p.setValue(kLastCategory, s.lastPreset.category);
     p.setValue(kLastFactory, s.lastPreset.factory);
     p.setValue(kCheckUpdates, s.checkUpdates);
+    p.setValue(kLastUpdateCheck, juce::String(s.lastUpdateCheckMs));
     p.saveIfNeeded();
     lastModified_ = file_.getLastModificationTime();
 }
@@ -209,6 +232,45 @@ void SettingsManager::setLastPreset(const PresetRef& ref)
         return;
     data_.lastPreset = ref;
     writeToProperties();
+}
+
+bool SettingsManager::startUpdateCheck()
+{
+    if (!updatesSupported())
+        return false;
+    updateState_.phase = UpdateState::Phase::checking;
+    const bool started = updateChecker_.check(info::kVersion,
+                                              [this](const update::UpdateResult& r)
+                                              {
+                                                  updateState_.phase = UpdateState::Phase::done;
+                                                  updateState_.result = r;
+                                                  updateChanges_.sendSynchronousChangeMessage();
+                                              });
+    if (!started)
+        return false;
+    updateChanges_.sendChangeMessage(); // asynchronous on purpose: this can run inside a button click
+    return true;
+}
+
+bool SettingsManager::checkForUpdatesNow()
+{
+    return startUpdateCheck();
+}
+
+void SettingsManager::checkForUpdatesIfDue()
+{
+    if (!data_.checkUpdates || updateChecker_.isBusy())
+        return;
+    if (!updatesSupported())
+        return;
+    reloadIfChanged(); // another instance or process may have checked meanwhile
+    const auto now = juce::Time::currentTimeMillis();
+    if (!data_.checkUpdates || !update::isCheckDue(data_.lastUpdateCheckMs, now))
+        return;
+    // Recorded when the request starts, so a failure does not make every editor open retry.
+    data_.lastUpdateCheckMs = now;
+    writeToProperties();
+    startUpdateCheck();
 }
 
 bool SettingsManager::reloadIfChanged()
