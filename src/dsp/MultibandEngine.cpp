@@ -247,8 +247,9 @@ void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
     for (int b = 0; b < numBands_; ++b)
     {
         const float hint = b == 0 ? 30.0f : eff[static_cast<size_t>(b - 1)];
-        bands_[static_cast<size_t>(b)].setSettings(settings_.bands[static_cast<size_t>(b)],
-                                                   audible[static_cast<size_t>(b)], hint);
+        auto bs = settings_.bands[static_cast<size_t>(b)];
+        bs.driveComp = settings_.driveComp;
+        bands_[static_cast<size_t>(b)].setSettings(bs, audible[static_cast<size_t>(b)], hint);
     }
     autoGain_.setEnabled(settings_.autoGain);
 

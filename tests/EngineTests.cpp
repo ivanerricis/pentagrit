@@ -449,6 +449,39 @@ TEST_CASE("Hard clipping aliases far less at 8x than at 1x", "[engine]")
     CHECK(reductionDb >= 20.0);
 }
 
+TEST_CASE("Drive compensation keeps the engine level of a low-level sine", "[engine]")
+{
+    const double sr = 48000.0;
+    const size_t n = 48000;
+    const auto in = sine(n, 500.0, sr, 0.001f);
+    for (auto f : {OSFactor::x1, OSFactor::x2})
+        for (auto sat : {SatType::tanh, SatType::tube, SatType::hardClip, SatType::wavefold})
+        {
+            auto s = neutral(f, 3);
+            for (auto& b : s.bands)
+            {
+                b.sat = sat;
+                b.driveDb = 24.0f;
+            }
+            auto levelDb = [&](bool comp)
+            {
+                s.driveComp = comp;
+                auto e = makeEngine(sr, 512, 1, s);
+                const auto out = renderMono(*e, s, in);
+                return toDb(rms(out, n * 3 / 4, n)) - toDb(rms(in, n * 3 / 4, n));
+            };
+            const double off = levelDb(false), on = levelDb(true);
+            // Reference: the same curve at 0 dB drive (what compensation restores).
+            for (auto& b : s.bands)
+                b.driveDb = 0.0f;
+            const double ref = levelDb(false);
+            INFO("os " << static_cast<int>(f) << " sat " << static_cast<int>(sat) << ": off " << off
+                       << " dB, on " << on << " dB, drive 0 dB " << ref << " dB");
+            CHECK(off > ref + 20.0);
+            CHECK(std::abs(on - ref) < 0.15);
+        }
+}
+
 TEST_CASE("Output does not depend on the host block size", "[engine]")
 {
     const double sr = 48000.0;

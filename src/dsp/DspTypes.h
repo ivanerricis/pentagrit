@@ -34,12 +34,14 @@ struct BandSettings
     float gainDb = 0, attackDb = 0, sustainDb = 0, speed01 = .5f, driveDb = 6, mix01 = 1;
     SatType sat = SatType::off;
     bool mute = false, solo = false, bypass = false;
+    bool driveComp = false; // global switch, copied into every band by the engine
 };
 
 struct EngineSettings
 {
     float inGainDb = 0, outGainDb = 0, mix01 = 1;
     bool autoGain = false, bypass = false;
+    bool driveComp = false; // saturator drive compensation (global)
     OSFactor os = OSFactor::x2;
     OSPhase osPhase = OSPhase::linear;
     // Offline-render oversampling: if osRenderSame, the live factor `os` is used; else `osRender`.

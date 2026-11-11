@@ -14,6 +14,14 @@ GlobalPanel::GlobalPanel(juce::AudioProcessorValueTreeState& apvts, MeterState& 
     setTitle("Master");
     for (auto* c : std::initializer_list<juce::Component*>{&in_, &out_, &mix_, &inMeter_, &outMeter_})
         addAndMakeVisible(*c);
+    driveComp_.getProperties().set(prop::kind, "pill");
+    driveComp_.setTitle("Drive compensation");
+    driveComp_.setTooltip(
+        "Drive compensation: keeps the level of quiet signals constant while you raise the drive");
+    driveComp_.setWantsKeyboardFocus(true);
+    addAndMakeVisible(driveComp_);
+    driveCompAtt_ = std::make_unique<juce::ButtonParameterAttachment>(*apvts.getParameter(pid::driveComp),
+                                                                      driveComp_, nullptr);
     inMeter_.setTooltip("Input peak level");
     inMeter_.setTitle("Input level");
     outMeter_.setTooltip("Output peak level");
@@ -72,6 +80,10 @@ void GlobalPanel::resized()
     outMeter_.setBounds(juce::Rectangle<int>(12, 140).withCentre({c2.getCentreX(), c2.getY() + 70}));
     b.removeFromTop(6);
     mix_.setBounds(b.removeFromTop(72).withSizeKeepingCentre(juce::jmin(b.getWidth(), 90), 72));
+    // Drive compensation switch, centred between the mix knob and the auto-gain readout.
+    b.removeFromBottom(26 + 8);
+    driveComp_.setBounds(
+        b.withSizeKeepingCentre(juce::jmin(b.getWidth(), 110), juce::jmin(b.getHeight(), 26)));
 }
 
 void GlobalPanel::paint(juce::Graphics& g)

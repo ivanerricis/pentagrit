@@ -125,6 +125,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
             Attr().withLabel("Hz").withStringFromValueFunction(hzText).withValueFromStringFunction(hzValue)));
 
     layout.add(boolParam(pid::bypass, "Bypass", false));
+    layout.add(boolParam(pid::driveComp, "Drive Compensation", false));
 
     for (int b = 0; b < kMaxBands; ++b)
     {
@@ -165,6 +166,7 @@ ParamRefs::ParamRefs(juce::AudioProcessorValueTreeState& apvts)
     bypass = raw(pid::bypass);
     osPhase = raw(pid::osPhase);
     osRender = raw(pid::osRender);
+    driveComp = raw(pid::driveComp);
     for (size_t i = 0; i < xover.size(); ++i)
         xover[i] = raw(pid::xover[i]);
 
@@ -195,6 +197,7 @@ EngineSettings ParamRefs::snapshot() const noexcept
     s.mix01 = ld(mix);
     s.autoGain = on(autoGain);
     s.bypass = on(bypass);
+    s.driveComp = on(driveComp);
     s.os = static_cast<OSFactor>(juce::jlimit(0, 3, juce::roundToInt(ld(oversampling))));
     s.osPhase = ld(osPhase) >= 0.5f ? OSPhase::minimum : OSPhase::linear;
     {

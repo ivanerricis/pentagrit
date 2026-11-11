@@ -49,6 +49,7 @@ void BandProcessor::setSettings(const BandSettings& settings, bool audible, floa
     transient_.setLowFrequencyHint(lowFreqHintHz);
     saturator_.setType(settings.sat);
     saturator_.setDriveDb(settings.driveDb);
+    saturator_.setDriveComp(settings.driveComp);
 
     const float g = audible ? dbToGain(settings.gainDb) : 0.0f;
     const float w = settings.bypass ? 0.0f : clampTo(settings.mix01, 0.0f, 1.0f);

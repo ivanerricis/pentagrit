@@ -15,12 +15,12 @@ float raw(PentagritAudioProcessor& p, const juce::String& id)
 }
 } // namespace
 
-TEST_CASE("Parameter layout has 63 unique, versioned IDs", "[parameters]")
+TEST_CASE("Parameter layout has 64 unique, versioned IDs", "[parameters]")
 {
     PentagritAudioProcessor proc;
     const auto& params = proc.getParameters();
     REQUIRE(static_cast<int>(params.size()) == kNumParameters);
-    REQUIRE(kNumParameters == 63);
+    REQUIRE(kNumParameters == 64);
 
     std::set<juce::String> ids;
     for (auto* p : params)
@@ -30,7 +30,7 @@ TEST_CASE("Parameter layout has 63 unique, versioned IDs", "[parameters]")
         ids.insert(withID->getParameterID());
         CHECK(withID->getVersionHint() == kParamVersion);
     }
-    CHECK(ids.size() == 63);
+    CHECK(ids.size() == 64);
 }
 
 TEST_CASE("Band parameter IDs follow the naming scheme", "[parameters]")
@@ -56,6 +56,9 @@ TEST_CASE("Parameter defaults", "[parameters]")
     CHECK(raw(proc, pid::bypass) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::osPhase) == Approx(0.0f).margin(1e-5f));
     CHECK(raw(proc, pid::osRender) == Approx(0.0f).margin(1e-5f));
+    CHECK(raw(proc, pid::driveComp) == Approx(0.0f).margin(1e-5f));
+    CHECK(proc.getAPVTS().getParameter(pid::driveComp)->isAutomatable());
+    CHECK(proc.getAPVTS().getParameter(pid::driveComp)->getName(64) == "Drive Compensation");
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::osPhase)->isAutomatable());
     CHECK_FALSE(proc.getAPVTS().getParameter(pid::osRender)->isAutomatable());
 
