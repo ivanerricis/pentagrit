@@ -6,7 +6,7 @@
 
 namespace pentagrit::ui
 {
-// Master column: In / Out knobs with meters, global Mix, auto-gain readout.
+// Master column: In / Out knobs with meters, global Mix, drive compensation switch, auto-gain readout.
 class GlobalPanel final : public juce::Component
 {
 public:
@@ -24,6 +24,8 @@ private:
     std::atomic<float>* autoGainOn_;
     LabelledKnob in_, out_, mix_;
     LevelMeter inMeter_, outMeter_;
+    juce::ToggleButton driveComp_{"DRIVE COMP"};
+    std::unique_ptr<juce::ButtonParameterAttachment> driveCompAtt_;
     juce::String agText_;
 };
 } // namespace pentagrit::ui
