@@ -21,7 +21,9 @@ constexpr float kMinScale = 0.5f, kMaxScale = 2.0f;
 void setParamWithGesture(juce::RangedAudioParameter* p, float denormalised)
 {
     if (p == nullptr)
+    {
         return;
+    }
     p->beginChangeGesture();
     p->setValueNotifyingHost(p->convertTo0to1(denormalised));
     p->endChangeGesture();
@@ -64,9 +66,13 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     topBar_.onSettingsClicked = [this]
     {
         if (isSettingsOpen())
+        {
             closeSettings();
+        }
         else
+        {
             openSettings();
+        }
     };
 
     numBands_ =
@@ -81,7 +87,8 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     int w = kBaseWidth, h = baseHeight();
     const float aspect = static_cast<float>(kBaseWidth) / static_cast<float>(baseHeight());
     if (std::abs(static_cast<float>(stored.x) / static_cast<float>(stored.y) - aspect) < 0.02f &&
-        stored.x >= kBaseWidth * kMinScale && stored.x <= kBaseWidth * kMaxScale)
+        static_cast<float>(stored.x) >= static_cast<float>(kBaseWidth) * kMinScale &&
+        static_cast<float>(stored.x) <= static_cast<float>(kBaseWidth) * kMaxScale)
     {
         w = stored.x;
         h = juce::roundToInt(static_cast<float>(w) / aspect);
@@ -115,9 +122,10 @@ void PentagritAudioProcessorEditor::updateConstraints()
 {
     const double aspect = static_cast<double>(kBaseWidth) / static_cast<double>(baseHeight());
     constrainer_.setFixedAspectRatio(aspect);
-    constrainer_.setSizeLimits(
-        juce::roundToInt(kBaseWidth * kMinScale), juce::roundToInt(baseHeight() * kMinScale),
-        juce::roundToInt(kBaseWidth * kMaxScale), juce::roundToInt(baseHeight() * kMaxScale));
+    constrainer_.setSizeLimits(juce::roundToInt(static_cast<float>(kBaseWidth) * kMinScale),
+                               juce::roundToInt(static_cast<float>(baseHeight()) * kMinScale),
+                               juce::roundToInt(static_cast<float>(kBaseWidth) * kMaxScale),
+                               juce::roundToInt(static_cast<float>(baseHeight()) * kMaxScale));
 }
 
 void PentagritAudioProcessorEditor::setUiOptions(const UiOptions& o)
@@ -132,13 +140,17 @@ void PentagritAudioProcessorEditor::setUiOptions(const UiOptions& o)
     {
         lnf_.setStyle(o.style);
         if (tooltip_ != nullptr)
+        {
             tooltip_->sendLookAndFeelChange();
+        }
         sendLookAndFeelChange();
     }
     applyThemeToChildren();
 
     for (auto& s : strips_)
+    {
         s->applyOptions(options_);
+    }
     global_.applyOptions(options_);
     footer_.setShowCpu(options_.showCpu);
 
@@ -174,7 +186,9 @@ void PentagritAudioProcessorEditor::applyThemeToChildren()
     topBar_.applyTheme();
     crossover_.applyTheme();
     for (auto& s : strips_)
+    {
         s->applyTheme();
+    }
     global_.applyTheme();
 }
 
@@ -196,14 +210,18 @@ void PentagritAudioProcessorEditor::openSettings()
     settingsPanel_->showTab(settingsPanel_->currentTab());
     settingsPanel_->setVisible(true);
     settingsPanel_->toFront(true);
-    if (settingsPanel_->isShowing()) // grabKeyboardFocus() asserts when the editor is not on screen
+    if (settingsPanel_->isShowing())
+    { // grabKeyboardFocus() asserts when the editor is not on screen
         settingsPanel_->grabKeyboardFocus();
+    }
 }
 
 void PentagritAudioProcessorEditor::closeSettings()
 {
     if (settingsPanel_ != nullptr)
+    {
         settingsPanel_->setVisible(false); // kept (hidden): this may run from one of its own callbacks
+    }
 }
 
 bool PentagritAudioProcessorEditor::undo()
@@ -234,11 +252,15 @@ bool PentagritAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
     // behind the settings overlay.
     if (isSettingsOpen() ||
         dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent()) != nullptr)
+    {
         return false;
+    }
 
     const auto mods = key.getModifiers();
     if (mods.isAltDown() || !(mods.isCommandDown() || mods.isCtrlDown()))
+    {
         return false;
+    }
 
     const int code = key.getKeyCode();
     const int letter =
@@ -266,7 +288,9 @@ void PentagritAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcast
 void PentagritAudioProcessorEditor::mouseEnter(const juce::MouseEvent& e)
 {
     if (juce::Time::getMillisecondCounterHiRes() < toastUntilMs_)
+    {
         return;
+    }
     juce::String hint;
     for (auto* c = e.eventComponent; c != nullptr && c != this; c = c->getParentComponent())
     {
@@ -274,7 +298,9 @@ void PentagritAudioProcessorEditor::mouseEnter(const juce::MouseEvent& e)
         {
             hint = tc->getTooltip();
             if (hint.isNotEmpty())
+            {
                 break;
+            }
         }
     }
     footer_.setHint(hint);
@@ -283,7 +309,9 @@ void PentagritAudioProcessorEditor::mouseEnter(const juce::MouseEvent& e)
 void PentagritAudioProcessorEditor::mouseExit(const juce::MouseEvent& e)
 {
     if (e.eventComponent == this && juce::Time::getMillisecondCounterHiRes() >= toastUntilMs_)
+    {
         footer_.setHint({});
+    }
 }
 
 void PentagritAudioProcessorEditor::applyNumBands(int n, bool)
@@ -298,7 +326,9 @@ void PentagritAudioProcessorEditor::applyNumBands(int n, bool)
         // band selector) the pushes are part of that undo step; raised by the host they are not undoable.
         std::optional<PentagritAudioProcessor::ScopedUndoPause> pause;
         if (!processor_.isUiGestureOpen())
+        {
             pause.emplace(processor_);
+        }
         auto& apvts = processor_.getAPVTS();
         float prev = apvts.getRawParameterValue(pid::xover[0])->load();
         for (size_t i = 1; i < pid::xover.size(); ++i)
@@ -319,7 +349,9 @@ void PentagritAudioProcessorEditor::applyNumBands(int n, bool)
     }
     crossover_.setNumBands(n);
     for (auto& s : strips_)
+    {
         s->setNumBands(n);
+    }
     layoutContent();
 }
 
@@ -332,7 +364,9 @@ void PentagritAudioProcessorEditor::layoutContent()
     crossover_.setBounds(kMargin, kCrossoverY, w - 2 * kMargin, kCrossoverH);
     footer_.setBounds(0, h - kFooterH, w, kFooterH);
     if (settingsPanel_ != nullptr)
+    {
         settingsPanel_->setBounds(0, 0, w, h);
+    }
 
     const int bodyTop = compact ? kCrossoverY : kCrossoverY + kCrossoverH + kMargin;
     const int bodyBottom = h - kFooterH - kMargin;
@@ -382,11 +416,15 @@ void PentagritAudioProcessorEditor::refreshNow()
     const int n =
         juce::jlimit(2, kMaxBands, juce::roundToInt(apvts.getRawParameterValue(pid::numBands)->load()));
     if (n != numBands_)
+    {
         applyNumBands(n, false);
+    }
 
     bool anySolo = false;
     for (int b = 0; b < numBands_; ++b)
+    {
         anySolo = anySolo || strips_[static_cast<size_t>(b)]->isSolo();
+    }
     for (int b = 0; b < numBands_; ++b)
     {
         auto& s = *strips_[static_cast<size_t>(b)];
@@ -396,7 +434,9 @@ void PentagritAudioProcessorEditor::refreshNow()
     topBar_.tick();
     updateHistoryButtons();
     if (!isCompact())
+    {
         crossover_.tick();
+    }
     global_.tick(dt);
     footer_.setCpu(processor_.getMeters().cpuLoad.load(std::memory_order_relaxed));
 }

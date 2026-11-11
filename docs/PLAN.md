@@ -69,7 +69,7 @@ Ordine: WP0 → (WP1, WP2, WP3, WP4-su-stub, WP5a, WP6, WP7, WP8 in parallelo; W
 
 ## CI/CD (WP6)
 - `build.yml` riusabile: matrix windows-2022 (Ninja+MSVC, sccache), macos-14 (universal, ccache), ubuntu-22.04 (ccache, xvfb); build Release, ctest, pluginval strictness 10 sul VST3, `auval` su macOS, clap-validator (advisory), artifact.
-- `ci.yml`: PR + push su main, concurrency cancel, lint (clang-format 18, titolo PR conventional commit), clang-tidy advisory; macOS solo su main / label `ci:macos` (minuti ×10 su piano Free).
+- `ci.yml`: PR + push su main, concurrency cancel, lint (clang-format 18, titolo PR conventional commit), clang-tidy e sanitizer bloccanti; macOS solo su main / label `ci:macos` (minuti ×10 su piano Free).
 - `release.yml`: tag `v*` → verifica versione = CMake → build 3 OS + zip (VST3, CLAP, AU, Standalone, LICENSE) → note da git-cliff → GitHub Release. Azioni pinnate per SHA. macOS: firma ad-hoc ora; firma/notarizzazione Apple in fase 2 (`docs/MACOS_SIGNING.md`, serve account Apple Developer).
 - Branch protection: ruleset via `gh api` (PR obbligatoria, check richiesti, squash only); su repo privato Free potrebbe richiedere Pro → documentato.
 
@@ -173,14 +173,13 @@ Pannello Settings (ingranaggio) con 4 schede.
 2. Lanciare in parallelo gli agenti Sonnet 5.5 per WP1, WP2, WP3, WP5a, WP6, WP7 (poi WP4, WP8, WP5b).
 
 ## Stato e prossimi passi (2026-11-11)
-Fatto: WP0–WP10, installer Windows/macOS, stili visivi, valori digitati e passo dei valori, job clang-tidy e ASan/UBSan (advisory), CI macOS su `macos-15`, parsing del testo dei parametri, validazione di `stateVersion`, latenza riportata dal message thread, controllo aggiornamenti opt-in (Windows/macOS), compensazione del drive, ADAA su Hard Clip e Wavefold, undo/redo, fix del crash all'uscita (cache dei font).
+Fatto: WP0–WP10, installer Windows/macOS, stili visivi, valori digitati e passo dei valori, job clang-tidy (zero warning) e ASan/UBSan, ora bloccanti, CI macOS su `macos-15`, parsing del testo dei parametri, validazione di `stateVersion`, latenza riportata dal message thread, controllo aggiornamenti opt-in (Windows/macOS), compensazione del drive, ADAA su Hard Clip e Wavefold, undo/redo, fix del crash all'uscita (cache dei font).
 
 Da fare:
 1. Ascolto dei preset di fabbrica: timbro di Hard Clip / Wavefold con ADAA (leggermente più scuri a 1x/2x) e compensazione del drive.
 2. Test manuale in un host reale (Reaper): testo dei parametri digitato, undo/redo, compensazione della latenza con il lookahead, controllo aggiornamenti dopo la prima release stabile.
 3. Verifica visiva della top bar più stretta e del toggle DRIVE COMP.
-4. Triage di circa 400 warning di clang-tidy (379 riguardano le parentesi graffe).
-5. Rendere obbligatorio il job sanitizer (`asan-ubsan (advisory)`) quando è pulito.
-6. Applicare il ruleset di branch protection su `main` (non ancora attivo, vedi `docs/BRANCH_PROTECTION.md`).
-7. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`).
-8. Release `v0.1.0-rc3`, poi `v0.1.0`. Il controllo aggiornamenti vede solo le release stabili (il "latest" di GitHub ignora le pre-release).
+4. Aggiornare il ruleset di `main` perché `asan-ubsan` e `clang-tidy` siano check obbligatori (i job sono già bloccanti in `ci.yml`, vedi `docs/BRANCH_PROTECTION.md`); lo fa il maintainer dopo il merge.
+5. Applicare il ruleset di branch protection su `main` se non ancora attivo (vedi `docs/BRANCH_PROTECTION.md`).
+6. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`).
+7. Release `v0.1.0-rc3`, poi `v0.1.0`. Il controllo aggiornamenti vede solo le release stabili (il "latest" di GitHub ignora le pre-release).

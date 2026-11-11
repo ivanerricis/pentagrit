@@ -18,9 +18,13 @@ using Block = juce::dsp::AudioBlock<float>;
 bool fillRamp(juce::SmoothedValue<float>& s, float* dst, int n) noexcept
 {
     if (!s.isSmoothing())
+    {
         return false;
+    }
     for (int i = 0; i < n; ++i)
+    {
         dst[i] = s.getNextValue();
+    }
     return true;
 }
 
@@ -35,13 +39,17 @@ void applyGain(juce::SmoothedValue<float>& s, std::vector<float>& ramp, const Bl
         {
             float* d = block.getChannelPointer(static_cast<size_t>(ch));
             for (int i = 0; i < n; ++i)
+            {
                 d[i] *= ramp[static_cast<size_t>(i)];
+            }
         }
     }
     else if (const float g = s.getTargetValue(); g != 1.0f)
     {
         for (int ch = 0; ch < nc; ++ch)
+        {
             juce::FloatVectorOperations::multiply(block.getChannelPointer(static_cast<size_t>(ch)), g, n);
+        }
     }
 }
 
@@ -54,17 +62,27 @@ void blendWithDry(juce::SmoothedValue<float>& s, std::vector<float>& ramp, const
     const bool smoothing = fillRamp(s, ramp.data(), n);
     const float w = s.getTargetValue();
     if (!smoothing && w >= 1.0f)
+    {
         return;
+    }
     for (int ch = 0; ch < nc; ++ch)
     {
         float* o = dst.getChannelPointer(static_cast<size_t>(ch));
         const float* d = dry.getChannelPointer(static_cast<size_t>(ch));
         if (smoothing)
+        {
             for (int i = 0; i < n; ++i)
+            {
                 o[i] = d[i] + (o[i] - d[i]) * ramp[static_cast<size_t>(i)];
+            }
+        }
         else
+        {
             for (int i = 0; i < n; ++i)
+            {
                 o[i] = d[i] + (o[i] - d[i]) * w;
+            }
+        }
     }
 }
 
@@ -78,7 +96,9 @@ float peakOf(const Block& block) noexcept
         {
             const float v = std::abs(d[i]);
             if (v > peak)
+            {
                 peak = v;
+            }
         }
     }
     return peak;
@@ -103,7 +123,9 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
         fir_[i].reset();
         iir_[i].reset();
         if ((2 << i) > maxFactor_)
+        {
             continue;
+        }
         const auto stages = i + 1;
         fir_[i] = std::make_unique<Oversampler>(static_cast<size_t>(numCh_), stages,
                                                 Oversampler::filterHalfBandFIREquiripple, true, true);
@@ -117,11 +139,17 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
     lookaheadBase_ = 0;
     int maxLatency = 0;
     for (int f = 1; f <= maxFactor_; f *= 2)
+    {
         for (auto p : {OSPhase::linear, OSPhase::minimum})
+        {
             maxLatency = std::max(maxLatency, computeLatency(f, p));
+        }
+    }
     int ringSize = 64;
     while (ringSize < maxLatency + maxLookaheadBase_ + 2)
+    {
         ringSize <<= 1;
+    }
     delayLine_.setSize(numCh_, ringSize, false, true, false);
     delayMask_ = ringSize - 1;
     delayPos_ = 0;
@@ -130,13 +158,17 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
     const int maxProc = maxBlock_ * maxFactor_;
     dryProc_.setSize(numCh_, maxProc, false, true, false);
     for (auto& b : bandBuf_)
+    {
         b.setSize(numCh_, maxProc, false, true, false);
+    }
     ramp_.assign(static_cast<size_t>(maxProc), 1.0f);
 
     const int maxProcDelay = maxLookaheadBase_ * maxFactor_;
     int dryRing = 64;
     while (dryRing < maxProcDelay + 2)
+    {
         dryRing <<= 1;
+    }
     dryDelayLine_.setSize(numCh_, dryRing, false, true, false);
     dryDelayMask_ = dryRing - 1;
     dryDelayPos_ = 0;
@@ -144,7 +176,9 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
 
     crossover_.prepare(sampleRate_, sampleRate_, maxProc, numCh_);
     for (auto& b : bands_)
+    {
         b.prepare(sampleRate_, maxProc, numCh_, maxProcDelay);
+    }
     autoGain_.prepare(sampleRate_, maxProc, numCh_);
 
     outGain_.reset(sampleRate_, kGainRampSec);
@@ -167,7 +201,9 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
 void MultibandEngine::reset() noexcept
 {
     if (!prepared_)
+    {
         return;
+    }
     resetCore();
     delayLine_.clear();
     delayPos_ = 0;
@@ -178,10 +214,14 @@ void MultibandEngine::reset() noexcept
 void MultibandEngine::resetCore() noexcept
 {
     if (auto* os = activeOversampler())
+    {
         os->reset();
+    }
     crossover_.reset();
     for (auto& b : bands_)
+    {
         b.reset();
+    }
     autoGain_.reset();
     dryDelayLine_.clear();
     dryDelayPos_ = 0;
@@ -190,7 +230,9 @@ void MultibandEngine::resetCore() noexcept
 MultibandEngine::Oversampler* MultibandEngine::activeOversampler() noexcept
 {
     if (factor_ <= 1)
+    {
         return nullptr;
+    }
     const auto idx = factorIndex(factor_);
     return phase_ == OSPhase::linear ? fir_[idx].get() : iir_[idx].get();
 }
@@ -198,11 +240,15 @@ MultibandEngine::Oversampler* MultibandEngine::activeOversampler() noexcept
 int MultibandEngine::computeLatency(int factor, OSPhase phase) const noexcept
 {
     if (factor <= 1)
+    {
         return 0;
+    }
     const auto idx = factorIndex(factor);
     const auto* os = phase == OSPhase::linear ? fir_[idx].get() : iir_[idx].get();
     if (os == nullptr)
+    {
         return 0;
+    }
     return std::max(0, static_cast<int>(std::ceil(os->getLatencyInSamples() - 1.0e-3f)));
 }
 
@@ -241,7 +287,9 @@ void MultibandEngine::applyConfiguration() noexcept
         numBands_ = numBands;
         crossover_.setNumBands(numBands_);
         for (auto& b : bands_)
+        {
             b.reset();
+        }
     }
     configured_ = true;
 }
@@ -249,17 +297,23 @@ void MultibandEngine::applyConfiguration() noexcept
 void MultibandEngine::setNonRealtime(bool nonRealtime) noexcept
 {
     if (nonRealtime == nonRealtime_)
+    {
         return;
+    }
     nonRealtime_ = nonRealtime;
     if (prepared_)
+    {
         setSettings(settings_);
+    }
 }
 
 void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
 {
     settings_ = settings;
     if (!prepared_)
+    {
         return;
+    }
     applyConfiguration();
 
     crossover_.setFrequencies(settings_.xoverHz);
@@ -294,7 +348,9 @@ void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
     }
 
     for (size_t i = 0; i < 4; ++i)
+    {
         meters_.effectiveXoverHz[i].store(eff[i], std::memory_order_relaxed);
+    }
     meters_.latencySamples.store(latency_, std::memory_order_relaxed);
 }
 
@@ -308,11 +364,15 @@ void MultibandEngine::process(juce::AudioBuffer<float>& buffer) noexcept
     const int total = buffer.getNumSamples();
     const int nc = std::min(buffer.getNumChannels(), numCh_);
     if (!prepared_ || total <= 0 || nc <= 0)
+    {
         return;
+    }
 
     juce::ScopedNoDenormals noDenormals;
     for (int pos = 0; pos < total; pos += maxBlock_)
+    {
         processChunk(buffer, pos, std::min(maxBlock_, total - pos), nc);
+    }
 
     for (int b = 0; b < kMaxBands; ++b)
     {
@@ -371,10 +431,14 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
             coreCold_ = true;
         }
         for (int ch = 0; ch < nc; ++ch)
+        {
             juce::FloatVectorOperations::copy(base.getChannelPointer(static_cast<size_t>(ch)),
                                               delayed_.getReadPointer(ch), n);
+        }
         for (auto& p : meters_.bandPeakDb)
+        {
             p.store(kSilenceDb, std::memory_order_relaxed);
+        }
         storePeak(meters_.outPeakDb, gainToDb(peakOf(base)));
         return;
     }
@@ -384,8 +448,10 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
     Oversampler* os = activeOversampler();
     Block work = base;
     if (os != nullptr)
+    {
         work = os->processSamplesUp(juce::dsp::AudioBlock<const float>(base))
                    .getSubsetChannelBlock(0, static_cast<size_t>(nc));
+    }
     const size_t m = work.getNumSamples();
 
     Block dry = Block(dryProc_).getSubBlock(0, m).getSubsetChannelBlock(0, static_cast<size_t>(nc));
@@ -414,9 +480,11 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
 
     Crossover::BandBlocks blocks;
     for (int b = 0; b < numBands_; ++b)
+    {
         blocks[static_cast<size_t>(b)] = Block(bandBuf_[static_cast<size_t>(b)])
                                              .getSubBlock(0, m)
                                              .getSubsetChannelBlock(0, static_cast<size_t>(nc));
+    }
     crossover_.split(juce::dsp::AudioBlock<const float>(work), blocks);
 
     work.clear();
@@ -432,7 +500,9 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
     blendWithDry(mix_, ramp_, work, dry);
 
     if (os != nullptr)
+    {
         os->processSamplesDown(base);
+    }
 
     applyGain(outGain_, ramp_, base);
 
@@ -441,17 +511,27 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
         const bool smoothing = fillRamp(bypassW_, ramp_.data(), n);
         const float wc = bypassW_.getTargetValue();
         if (smoothing || wc > 0.0f)
+        {
             for (int ch = 0; ch < nc; ++ch)
             {
                 float* o = base.getChannelPointer(static_cast<size_t>(ch));
                 const float* d = delayed_.getReadPointer(ch);
                 if (smoothing)
+                {
                     for (int i = 0; i < n; ++i)
+                    {
                         o[i] += (d[i] - o[i]) * ramp_[static_cast<size_t>(i)];
+                    }
+                }
                 else
+                {
                     for (int i = 0; i < n; ++i)
+                    {
                         o[i] += (d[i] - o[i]) * wc;
+                    }
+                }
             }
+        }
     }
     storePeak(meters_.outPeakDb, gainToDb(peakOf(base)));
 }
@@ -467,7 +547,9 @@ int MultibandEngine::effectiveFactor(OSFactor requested, double sampleRate) noex
 {
     int factor = 1 << static_cast<int>(requested);
     while (factor > 1 && sampleRate * factor > kMaxRate)
+    {
         factor /= 2;
+    }
     return factor;
 }
 
@@ -477,7 +559,9 @@ std::array<bool, kMaxBands> MultibandEngine::computeAudibility(const EngineSetti
     const int nb = std::clamp(s.numBands, 0, kMaxBands);
     bool anySolo = false;
     for (int b = 0; b < nb; ++b)
+    {
         anySolo = anySolo || s.bands[static_cast<size_t>(b)].solo;
+    }
 
     for (int b = 0; b < nb; ++b)
     {

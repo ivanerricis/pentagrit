@@ -53,8 +53,12 @@ bool updatesSupported()
 int nearestOf(int v, std::initializer_list<int> allowed, int fallback)
 {
     for (int a : allowed)
+    {
         if (a == v)
+        {
             return v;
+        }
+    }
     return fallback;
 }
 } // namespace
@@ -62,7 +66,9 @@ int nearestOf(int v, std::initializer_list<int> allowed, int fallback)
 juce::File SettingsManager::getDefaultFile()
 {
     if (overrides().file != juce::File())
+    {
         return overrides().file;
+    }
     auto base = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
 #if JUCE_MAC
     base = base.getChildFile("Application Support");
@@ -91,21 +97,27 @@ void SettingsManager::setIgnoreLastPreset(bool ignore)
 SettingsManager::SettingsManager()
 {
     if (overrides().updateFetcher)
+    {
         updateChecker_.setFetcher(overrides().updateFetcher);
+    }
     init(getDefaultFile(), overrides().readOnly);
 }
 
 SettingsManager::SettingsManager(const juce::File& file)
 {
     if (overrides().updateFetcher)
+    {
         updateChecker_.setFetcher(overrides().updateFetcher);
+    }
     init(file, false);
 }
 
 SettingsManager::~SettingsManager()
 {
     if (props_ != nullptr)
+    {
         props_->saveIfNeeded();
+    }
 }
 
 void SettingsManager::init(const juce::File& file, bool readOnly)
@@ -137,14 +149,20 @@ UserSettings SettingsManager::sanitised(UserSettings s)
     {
         float best = 0.0f; // snap to the nearest allowed step (0 = continuous)
         for (float c : {0.0f, 0.1f, 0.5f, 1.0f})
+        {
             if (std::isfinite(s.valueStepDb) && std::abs(c - s.valueStepDb) < std::abs(best - s.valueStepDb))
+            {
                 best = c;
+            }
+        }
         s.valueStepDb = best;
     }
     s.meterRefreshHz = nearestOf(s.meterRefreshHz, {30, 60}, 30);
     s.presetFolder = s.presetFolder.trim();
     if (!s.startup.isValid())
+    {
         s.startupMode = s.startupMode == StartupMode::specific ? StartupMode::last : s.startupMode;
+    }
     return s;
 }
 
@@ -229,7 +247,9 @@ void SettingsManager::resetToDefaults()
 void SettingsManager::setLastPreset(const PresetRef& ref)
 {
     if (ref == data_.lastPreset || overrides().ignoreLastPreset)
+    {
         return;
+    }
     data_.lastPreset = ref;
     writeToProperties();
 }
@@ -237,7 +257,9 @@ void SettingsManager::setLastPreset(const PresetRef& ref)
 bool SettingsManager::startUpdateCheck()
 {
     if (!updatesSupported())
+    {
         return false;
+    }
     updateState_.phase = UpdateState::Phase::checking;
     const bool started = updateChecker_.check(info::kVersion,
                                               [this](const update::UpdateResult& r)
@@ -247,7 +269,9 @@ bool SettingsManager::startUpdateCheck()
                                                   updateChanges_.sendSynchronousChangeMessage();
                                               });
     if (!started)
+    {
         return false;
+    }
     updateChanges_.sendChangeMessage(); // asynchronous on purpose: this can run inside a button click
     return true;
 }
@@ -260,13 +284,19 @@ bool SettingsManager::checkForUpdatesNow()
 void SettingsManager::checkForUpdatesIfDue()
 {
     if (!data_.checkUpdates || updateChecker_.isBusy())
+    {
         return;
+    }
     if (!updatesSupported())
+    {
         return;
+    }
     reloadIfChanged(); // another instance or process may have checked meanwhile
     const auto now = juce::Time::currentTimeMillis();
     if (!data_.checkUpdates || !update::isCheckDue(data_.lastUpdateCheckMs, now))
+    {
         return;
+    }
     // Recorded when the request starts, so a failure does not make every editor open retry.
     data_.lastUpdateCheckMs = now;
     writeToProperties();
@@ -277,7 +307,9 @@ bool SettingsManager::reloadIfChanged()
 {
     const auto mod = file_.getLastModificationTime();
     if (mod == lastModified_)
+    {
         return false;
+    }
     lastModified_ = mod;
     const auto before = data_;
     props_->reload();
@@ -292,7 +324,9 @@ bool SettingsManager::reloadIfChanged()
                          before.startupMode != data_.startupMode || !(before.startup == data_.startup) ||
                          before.checkUpdates != data_.checkUpdates;
     if (differs)
+    {
         sendSynchronousChangeMessage();
+    }
     return differs;
 }
 
@@ -327,16 +361,24 @@ juce::File SettingsManager::getEffectivePresetFolder() const
 bool SettingsManager::applyStartupPreset(const UserSettings& s, PresetManager& presets)
 {
     if (s.startupMode == StartupMode::init)
+    {
         return presets.loadInit().wasOk();
+    }
 
     const auto& ref = s.startupMode == StartupMode::specific ? s.startup : s.lastPreset;
     if (!ref.isValid())
+    {
         return false;
+    }
     const PresetEntry wanted{ref.name, ref.category, {}, ref.factory, {}};
     const auto& list = ref.factory ? presets.getFactoryPresets() : presets.getUserPresets();
     for (const auto& e : list)
+    {
         if (e.isSameAs(wanted))
+        {
             return presets.loadPreset(e).wasOk();
+        }
+    }
     return false;
 }
 } // namespace pentagrit

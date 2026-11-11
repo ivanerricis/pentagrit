@@ -33,7 +33,9 @@ void HistoryButton::paintButton(juce::Graphics& g, bool highlighted, bool down)
     head.addTriangle(-r - 2.6f, -0.4f, -r + 2.6f, -0.4f, -r, 3.0f);
     auto t = juce::AffineTransform::translation(area.getCentreX(), area.getCentreY() + 0.8f);
     if (kind_ == Kind::redo)
+    {
         t = juce::AffineTransform::scale(-1.0f, 1.0f).followedBy(t);
+    }
     g.setColour(en ? (highlighted || down ? p.ink : p.ink2) : p.ink3);
     g.strokePath(arc, juce::PathStrokeType(1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::butt),
                  t);
@@ -67,12 +69,16 @@ TopBar::TopBar(juce::AudioProcessorValueTreeState& apvts, MeterState& meters,
     undo_.onClick = [this]
     {
         if (onUndo)
+        {
             onUndo();
+        }
     };
     redo_.onClick = [this]
     {
         if (onRedo)
+        {
             onRedo();
+        }
     };
 
     autoGain_.getProperties().set(prop::kind, "pill");
@@ -88,7 +94,9 @@ TopBar::TopBar(juce::AudioProcessorValueTreeState& apvts, MeterState& meters,
     gear_.onClick = [this]
     {
         if (onSettingsClicked)
+        {
             onSettingsClicked();
+        }
     };
     for (auto* b : {&autoGain_, &bypass_, &gear_})
     {
@@ -120,7 +128,9 @@ void TopBar::tick()
     const int lat = meters_.latencySamples.load(std::memory_order_relaxed);
     const double sr = sampleRate_ ? sampleRate_() : 0.0;
     if (lat == lastLatency_ && sr == lastRate_)
+    {
         return;
+    }
     lastLatency_ = lat;
     lastRate_ = sr;
     // One decimal below 100 ms, none above, so the text stays short (at most "5.3 ms  1009 smp" in practice).
@@ -235,7 +245,9 @@ void TopBar::paint(juce::Graphics& g)
     ga.addLineOfText(wordmark, "PENTAGRIT", 0.0f, 0.0f);
     const float textW = ga.getBoundingBox(0, -1, true).getWidth();
     if (textW > kWordmarkW)
+    {
         wordmark = fonts::display(13.0f * kWordmarkW / textW, fonts::Weight::semiBold, 0.14f);
+    }
     g.setFont(wordmark);
     g.drawText("PENTAGRIT", 54, 0, 94, getHeight(), juce::Justification::centredLeft, false);
 

@@ -49,7 +49,9 @@ void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
     const auto wetCh = wet.getNumChannels();
     const auto refCh = ref.getNumChannels();
     if (n == 0 || wetCh == 0)
+    {
         return;
+    }
 
     const float invRefCh = refCh > 0 ? 1.0f / static_cast<float>(refCh) : 0.0f;
     const float invWetCh = 1.0f / static_cast<float>(wetCh);
@@ -70,13 +72,17 @@ void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
         {
             const float* d = ref.getChannelPointer(c) + start;
             for (size_t i = 0; i < refLen; ++i)
+            {
                 pr[i] += d[i] * d[i];
+            }
         }
         for (size_t c = 0; c < wetCh; ++c)
         {
             const float* d = wet.getChannelPointer(c) + start;
             for (size_t i = 0; i < len; ++i)
+            {
                 pw[i] += d[i] * d[i];
+            }
         }
         for (size_t i = 0; i < len; ++i)
         {
@@ -86,14 +92,20 @@ void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
         }
     }
     if (mRef < 1.0e-20f)
+    {
         mRef = 0.0f;
+    }
     if (mWet < 1.0e-20f)
+    {
         mWet = 0.0f;
+    }
     meanRef_ = mRef;
     meanWet_ = mWet;
 
     if (mRef > kRefFloor)
+    {
         targetDb_ = clampTo(10.0f * std::log10(mRef / (mWet + 1.0e-12f)), -kMaxDb, kMaxDb);
+    }
     // else: hold the previous target
 
     const float goal = enabled_ ? targetDb_ : 0.0f;
@@ -102,11 +114,15 @@ void AutoGain::process(const juce::dsp::AudioBlock<const float>& ref,
     const float cN = std::pow(gainCoeff_, static_cast<float>(n));
     float endDb = goal + cN * (startDb - goal);
     if (!enabled_ && std::abs(endDb) < 1.0e-3f)
+    {
         endDb = 0.0f;
+    }
     currentGainDb_ = endDb;
 
     if (startDb == 0.0f && endDb == 0.0f)
+    {
         return;
+    }
 
     const float g0 = dbToGain(startDb), g1 = dbToGain(endDb);
     const float step = (g1 - g0) / static_cast<float>(n);

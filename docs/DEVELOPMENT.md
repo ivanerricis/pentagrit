@@ -30,17 +30,17 @@ On macOS also run `auval`; for CLAP use clap-validator. CI runs all of these.
 
 `clang-format` (v18 in CI) with `.clang-format`. See `CONTRIBUTING.md`.
 
-`clang-tidy` (job `clang-tidy (advisory)`) is advisory and needs a compile database plus the generated binary-data headers (`PentagritUiData.h`, `PentagritPresetData.h`). Build the targets `PentagritUiAssets` and `PentagritPresetData` before running it, as the CI job does:
+`clang-tidy` (job `clang-tidy`) is enforced: any warning in project code (`src/`) fails the job (`--warnings-as-errors='*'`). The checks are listed in `.clang-tidy`; `performance-enum-size` is disabled on purpose because several enums are frozen contracts. It needs a compile database plus the generated binary-data headers (`PentagritUiData.h`, `PentagritPresetData.h`). Build the targets `PentagritUiAssets` and `PentagritPresetData` before running it, as the CI job does:
 
 ```
 cmake --preset ci-linux -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPENTAGRIT_BUILD_TESTS=OFF
 cmake --build build/ci-linux --target PentagritUiAssets PentagritPresetData
-git ls-files 'src/*.cpp' | xargs clang-tidy-18 -p build/ci-linux --quiet --header-filter="^$PWD/src/.*"
+git ls-files 'src/*.cpp' | xargs clang-tidy-18 -p build/ci-linux --quiet --warnings-as-errors='*' --header-filter="^$PWD/src/.*"
 ```
 
 ## Sanitizers
 
-The `ci-linux-asan` preset builds a Debug configuration with AddressSanitizer and UndefinedBehaviorSanitizer (JUCE `jassert`s stay active). The CI job `asan-ubsan (advisory)` runs the test binary under `xvfb-run` with `~[allocation]`: the allocation tests replace the global `operator new`/`delete` and conflict with ASan, and ctest cannot filter on Catch2 tags, so the binary is started directly. The job is advisory (`continue-on-error`) until it is clean.
+The `ci-linux-asan` preset builds a Debug configuration with AddressSanitizer and UndefinedBehaviorSanitizer (JUCE `jassert`s stay active). The CI job `asan-ubsan` runs the test binary under `xvfb-run` with `~[allocation]`: the allocation tests replace the global `operator new`/`delete` and conflict with ASan, and ctest cannot filter on Catch2 tags, so the binary is started directly. The job is enforced (required check): findings halt the run (`halt_on_error=1`) and fail the job.
 
 ```
 cmake --preset ci-linux-asan

@@ -30,7 +30,9 @@ void BandStrip::Inner::paint(juce::Graphics& g)
     const auto& p = pal(*this);
     g.setColour(p.bg0);
     for (const auto& r : sections)
+    {
         g.fillRoundedRectangle(r.toFloat(), p.rWell);
+    }
 }
 
 BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& meters, int bandIndex)
@@ -60,7 +62,9 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
     setupToggle(solo_, "solo", bn + " solo", "Solo this band");
     setupToggle(bypass_, "bypass", bn + " bypass", "Bypass the processing of this band");
     for (auto* b : {&mute_, &solo_, &bypass_})
+    {
         addAndMakeVisible(*b);
+    }
     auto attach = [this](BandParam bp, juce::ToggleButton& btn)
     {
         return std::make_unique<juce::ButtonParameterAttachment>(
@@ -84,7 +88,9 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
     from_.onTextChange = [this] { commitFreq(false, from_.getText()); };
     to_.onTextChange = [this] { commitFreq(true, to_.getText()); };
     for (auto* l : {&from_, &to_, &fromCaption_, &toCaption_})
+    {
         addChildComponent(*l);
+    }
 
     addAndMakeVisible(inner_);
     inner_.setInterceptsMouseClicks(false, true);
@@ -93,7 +99,9 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
     meter_.setTitle(bn + " output level");
     for (auto* c : std::initializer_list<juce::Component*>{&transient_, &attack_, &sustain_, &speed_, &sat_,
                                                            &curve_, &drive_, &mix_, &gain_, &meter_})
+    {
         inner_.addAndMakeVisible(*c);
+    }
 
     sat_.onTypeChanged = [this](int t) { curve_.setType(t); };
     curve_.setType(sat_.type());
@@ -116,7 +124,9 @@ std::array<float, 4> BandStrip::xoverValues() const
 {
     std::array<float, 4> v{};
     for (size_t i = 0; i < 4; ++i)
+    {
         v[i] = apvts_.getRawParameterValue(pid::xover[i])->load();
+    }
     return v;
 }
 
@@ -125,11 +135,17 @@ void BandStrip::applyTheme()
     const auto& p = pal(*this);
     const auto c = p.band[static_cast<size_t>(index_)];
     for (auto* k : knobs_)
+    {
         k->setColour(c);
+    }
     for (auto* l : {&from_, &to_})
+    {
         l->setFont(fonts::mono(10.5f, fonts::Weight::regular));
+    }
     for (auto* l : {&fromCaption_, &toCaption_})
+    {
         l->setFont(fonts::sans(10.0f, fonts::Weight::medium, 0.08f));
+    }
     curve_.setBandColour(c);
     transient_.setBandColour(c);
     meter_.setBarColour(c);
@@ -139,11 +155,15 @@ void BandStrip::applyTheme()
 void BandStrip::applyOptions(const UiOptions& o)
 {
     for (auto* k : knobs_)
+    {
         k->applyOptions(o);
+    }
     meter_.setBallistics(o.meterHoldSec, o.meterReleaseDbPerSec);
     compact_ = o.layout == Layout::compact;
     for (auto* l : {&from_, &to_, &fromCaption_, &toCaption_})
+    {
         l->setVisible(compact_);
+    }
     resized();
     refreshFreqFields();
 }
@@ -157,7 +177,9 @@ void BandStrip::setNumBands(int n)
 void BandStrip::setDimmed(bool dim)
 {
     if (dim == dimmed_)
+    {
         return;
+    }
     dimmed_ = dim;
     inner_.setAlpha(dim ? 0.45f : 1.0f);
 }
@@ -165,7 +187,9 @@ void BandStrip::setDimmed(bool dim)
 void BandStrip::refreshFreqFields()
 {
     if (!compact_)
+    {
         return;
+    }
     const auto hz = xoverValues();
     const float lo = index_ == 0 ? xover::minFreq : hz[static_cast<size_t>(index_ - 1)];
     const float hi = index_ >= numBands_ - 1 ? xover::maxFreq : hz[static_cast<size_t>(index_)];
@@ -173,9 +197,13 @@ void BandStrip::refreshFreqFields()
     auto setField = [](juce::Label& l, const juce::String& text, bool editable)
     {
         if (l.getText() != text && !l.isBeingEdited())
+        {
             l.setText(text, juce::dontSendNotification);
+        }
         if (l.isEditable() != editable)
+        {
             l.setEditable(editable, editable, false);
+        }
         l.setAlpha(editable ? 1.0f : 0.6f);
         l.setColour(juce::Label::textColourId, editable ? pal(l).ink : pal(l).ink2);
         l.setColour(juce::Label::backgroundColourId, pal(l).bg0);
@@ -221,7 +249,9 @@ void BandStrip::tick(float dt)
         curve_.setDriveDb(d);
     }
     if (compact_)
+    {
         refreshFreqFields();
+    }
 }
 
 void BandStrip::resized()

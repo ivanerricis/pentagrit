@@ -4,6 +4,7 @@
 #include "dsp/DspUtils.h"
 
 #include <bit>
+#include <cmath>
 #include <cstdint>
 
 namespace pentagrit
@@ -61,7 +62,7 @@ void TransientShaper::updateCoeffs() noexcept
     aGain_ = timeToCoeff(0.001, rate_);
 
     // ~12 kHz control rate (83 us), never coarser than 8 samples.
-    ctrlInterval_ = clampTo(static_cast<int>(rate_ / 12000.0 + 0.5), 8, kMaxCtrlInterval);
+    ctrlInterval_ = clampTo(static_cast<int>(std::lround(rate_ / 12000.0)), 8, kMaxCtrlInterval);
     aGainCtrl_ = timeToCoeff(0.001, rate_ / ctrlInterval_);
     ctrlLeft_ = std::min(ctrlLeft_, ctrlInterval_);
 }
@@ -98,7 +99,9 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
     const auto numCh = audio.getNumChannels();
     const auto n = audio.getNumSamples();
     if (numCh == 0 || n == 0 || detector.getNumChannels() < numCh || detector.getNumSamples() < n)
+    {
         return;
+    }
 
     float* ch[8];
     const float* det[8];
@@ -150,16 +153,24 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
 
         // Rectified, channel-linked detector input (vectorizable).
         for (size_t k = 0; k < len; ++k)
+        {
             xs[k] = std::abs(det[0][i + k]);
+        }
         for (size_t c = 1; c < nc; ++c)
+        {
             for (size_t k = 0; k < len; ++k)
+            {
                 xs[k] = std::max(xs[k], std::abs(det[c][i + k]));
+            }
+        }
 
         for (size_t k = 0; k < len; ++k)
         {
             float x = xs[k];
-            if (!(x < 1.0e6f)) // NaN/Inf guard
+            if (!(x < 1.0e6f))
+            { // NaN/Inf guard
                 x = 0.0f;
+            }
             e1 = follow(e1, x, aF, r1);
             e2 = follow(e2, x, aS, r1);
             e3 = follow(e3, x, aF, r3);

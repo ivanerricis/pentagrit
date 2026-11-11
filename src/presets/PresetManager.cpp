@@ -24,10 +24,16 @@ bool isReservedWindowsName(const juce::String& s)
     static const char* reserved[] = {"CON", "PRN", "AUX", "NUL"};
     const auto up = s.upToFirstOccurrenceOf(".", false, false).trim().toUpperCase();
     for (auto* r : reserved)
+    {
         if (up == r)
+        {
             return true;
+        }
+    }
     if (up.length() == 4 && (up.startsWith("COM") || up.startsWith("LPT")) && up[3] >= '1' && up[3] <= '9')
+    {
         return true;
+    }
     return false;
 }
 
@@ -68,11 +74,15 @@ juce::String PresetManager::sanitiseName(const juce::String& name)
     for (auto c : name)
     {
         if (c < 32 || juce::String("\\/:*?\"<>|").containsChar(c))
+        {
             continue;
+        }
         if (juce::CharacterFunctions::isWhitespace(c))
         {
             if (!lastSpace && out.isNotEmpty())
+            {
                 out << ' ';
+            }
             lastSpace = true;
         }
         else
@@ -83,9 +93,13 @@ juce::String PresetManager::sanitiseName(const juce::String& name)
     }
     out = out.substring(0, kMaxNameLength).trim();
     while (out.endsWithChar('.') || out.endsWithChar(' '))
+    {
         out = out.dropLastCharacters(1);
+    }
     if (out.isEmpty() || isReservedWindowsName(out))
+    {
         return {};
+    }
     return out;
 }
 
@@ -97,24 +111,34 @@ bool PresetManager::isPresetParameter(const juce::String& id)
 juce::Result PresetManager::parsePreset(const juce::XmlElement& root, PresetEntry& meta, ParamValues& values)
 {
     if (!root.hasTagName(kPresetTag))
+    {
         return juce::Result::fail("Not a Pentagrit preset");
+    }
 
     if (root.hasAttribute("stateVersion"))
     {
         const auto text = root.getStringAttribute("stateVersion").trim();
         if (!text.containsOnly("0123456789") || text.isEmpty())
+        {
             return juce::Result::fail("Invalid preset version");
+        }
         const int version = text.getIntValue();
         if (version < 1)
+        {
             return juce::Result::fail("Invalid preset version");
+        }
         if (version > kStateVersion)
+        {
             return juce::Result::fail("Preset was created by a newer version of Pentagrit");
+        }
         // Migration of older versions goes here (only version 1 exists for now).
     }
 
     const auto* state = root.getChildByName(kStateTag);
     if (state == nullptr)
+    {
         return juce::Result::fail("Preset has no state");
+    }
 
     PresetEntry m;
     m.name = root.getStringAttribute("name");
@@ -126,10 +150,14 @@ juce::Result PresetManager::parsePreset(const juce::XmlElement& root, PresetEntr
     {
         const auto id = p->getStringAttribute("id");
         if (id.isEmpty() || !p->hasAttribute("value") || !isPresetParameter(id))
+        {
             continue;
+        }
         const double value = p->getDoubleAttribute("value", std::nan(""));
         if (!std::isfinite(value))
+        {
             continue;
+        }
         v[id] = static_cast<float>(value);
     }
 
@@ -141,13 +169,19 @@ juce::Result PresetManager::parsePreset(const juce::XmlElement& root, PresetEntr
 juce::Result PresetManager::parsePresetFile(const juce::File& file, PresetEntry& meta, ParamValues& values)
 {
     if (!file.existsAsFile())
+    {
         return juce::Result::fail("File not found");
+    }
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr)
+    {
         return juce::Result::fail("File is not a valid preset (unreadable XML)");
+    }
     auto r = parsePreset(*xml, meta, values);
     if (r.failed())
+    {
         return r;
+    }
     meta.file = file;
     return r;
 }
@@ -166,9 +200,13 @@ PresetManager::PresetManager(juce::AudioProcessorValueTreeState& apvts, const ju
 
     apvts_.state.addListener(this);
     for (auto* p : apvts_.processor.getParameters())
+    {
         if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(p);
             r != nullptr && isPresetParameter(r->paramID))
+        {
             apvts_.addParameterListener(r->paramID, this);
+        }
+    }
     needsSync_ = true;
     ensureSynced();
 }
@@ -177,9 +215,13 @@ PresetManager::~PresetManager()
 {
     cancelPendingUpdate();
     for (auto* p : apvts_.processor.getParameters())
+    {
         if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(p);
             r != nullptr && isPresetParameter(r->paramID))
+        {
             apvts_.removeParameterListener(r->paramID, this);
+        }
+    }
     apvts_.state.removeListener(this);
 }
 
@@ -219,7 +261,9 @@ void PresetManager::rescan()
             meta.factory = false;
             meta.category = category; // the folder is authoritative
             if (meta.name.isEmpty())
+            {
                 meta.name = f.getFileNameWithoutExtension();
+            }
             userEntries_.push_back(meta);
         }
     };
@@ -228,14 +272,18 @@ void PresetManager::rescan()
     {
         scanDir(userFolder_, kUnsortedCategory);
         for (const auto& d : userFolder_.findChildFiles(juce::File::findDirectories, false))
+        {
             scanDir(d, d.getFileName());
+        }
     }
 
     std::sort(userEntries_.begin(), userEntries_.end(),
               [](const PresetEntry& a, const PresetEntry& b)
               {
                   if (const int c = compareNoCase(a.category, b.category))
+                  {
                       return c < 0;
+                  }
                   return compareNoCase(a.name, b.name) < 0;
               });
 }
@@ -244,7 +292,9 @@ juce::StringArray PresetManager::getFactoryCategories() const
 {
     juce::StringArray cats;
     for (const auto& e : factoryEntries_)
+    {
         cats.addIfNotAlreadyThere(e.category);
+    }
     return cats;
 }
 
@@ -252,10 +302,16 @@ juce::StringArray PresetManager::getUserCategories() const
 {
     juce::StringArray cats;
     for (const auto& e : userEntries_)
+    {
         cats.addIfNotAlreadyThere(e.category);
+    }
     if (userFolder_.isDirectory())
+    {
         for (const auto& d : userFolder_.findChildFiles(juce::File::findDirectories, false))
+        {
             cats.addIfNotAlreadyThere(d.getFileName());
+        }
+    }
     cats.sort(true);
     return cats;
 }
@@ -264,8 +320,12 @@ std::vector<PresetEntry> PresetManager::getPresetsInCategory(bool factory, const
 {
     std::vector<PresetEntry> out;
     for (const auto& e : factory ? factoryEntries_ : userEntries_)
+    {
         if (e.category == category)
+        {
             out.push_back(e);
+        }
+    }
     return out;
 }
 
@@ -282,7 +342,9 @@ std::vector<PresetEntry> PresetManager::getOrderedPresets() const
 void PresetManager::ensureSynced()
 {
     if (!needsSync_)
+    {
         return;
+    }
     needsSync_ = false;
 
     const auto& state = apvts_.state;
@@ -314,7 +376,9 @@ void PresetManager::ensureSynced()
     for (size_t i = 0; i < list.size(); ++i)
     {
         if (!list[i].isSameAs(ref))
+        {
             continue;
+        }
         ref = list[i];
         if (ref.factory)
         {
@@ -380,9 +444,13 @@ PresetManager::ParamValues PresetManager::captureValues() const
     {
         auto* r = dynamic_cast<juce::RangedAudioParameter*>(p);
         if (r == nullptr || !isPresetParameter(r->paramID))
+        {
             continue;
+        }
         if (auto* raw = apvts_.getRawParameterValue(r->paramID))
+        {
             out[r->paramID] = raw->load();
+        }
     }
     return out;
 }
@@ -394,7 +462,9 @@ PresetManager::ParamValues PresetManager::resolveValues(const ParamValues& parti
     {
         auto* r = dynamic_cast<juce::RangedAudioParameter*>(p);
         if (r == nullptr || !isPresetParameter(r->paramID))
+        {
             continue;
+        }
         float v = paramDefault(*r);
         if (auto it = partial.find(r->paramID); it != partial.end() && std::isfinite(it->second))
         {
@@ -431,7 +501,9 @@ void PresetManager::applyValues(const ParamValues& partial, const PresetEntry* r
     }
     apvts_.replaceState(tree);
     if (onStateReplaced_)
+    {
         onStateReplaced_();
+    }
 
     --suppress_;
 }
@@ -453,15 +525,21 @@ void PresetManager::setCurrent(const PresetEntry& entry, const ParamValues& base
 bool PresetManager::computeModified() const
 {
     if (!hasBaseline_)
+    {
         return false;
+    }
     for (const auto& [id, value] : baseline_)
     {
         auto* raw = apvts_.getRawParameterValue(id);
         if (raw == nullptr)
+        {
             continue;
+        }
         const float now = raw->load();
         if (std::abs(now - value) > 1e-3f + 1e-5f * std::abs(value))
+        {
             return true;
+        }
     }
     return false;
 }
@@ -469,7 +547,9 @@ bool PresetManager::computeModified() const
 void PresetManager::updateModifiedFlag()
 {
     if (suppress_ > 0 || needsSync_)
+    {
         return;
+    }
     const bool m = computeModified();
     if (m != lastModified_)
     {
@@ -481,12 +561,16 @@ void PresetManager::updateModifiedFlag()
 void PresetManager::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property)
 {
     if (suppress_ > 0)
+    {
         return;
+    }
 
     if (tree.hasType(kParamType))
     {
         if (property == kValueProp && !needsSync_)
+        {
             updateModifiedFlag();
+        }
     }
     else if (tree == apvts_.state &&
              (property == kPropName || property == kPropCategory || property == kPropFactory))
@@ -501,7 +585,9 @@ void PresetManager::valueTreeRedirected(juce::ValueTree&)
 {
     // replaceState() (e.g. the DAW restoring a project) swaps the whole tree.
     if (onStateReplaced_)
+    {
         onStateReplaced_();
+    }
     if (suppress_ == 0)
     {
         needsSync_ = true;
@@ -512,9 +598,13 @@ void PresetManager::valueTreeRedirected(juce::ValueTree&)
 void PresetManager::parameterChanged(const juce::String&, float)
 {
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+    {
         updateModifiedFlag();
+    }
     else
+    {
         triggerAsyncUpdate();
+    }
 }
 
 void PresetManager::handleAsyncUpdate()
@@ -525,13 +615,17 @@ void PresetManager::handleAsyncUpdate()
 void PresetManager::valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&)
 {
     if (suppress_ == 0)
+    {
         sendChangeMessage();
+    }
 }
 
 void PresetManager::valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int)
 {
     if (suppress_ == 0)
+    {
         sendChangeMessage();
+    }
 }
 
 // ---- Load
@@ -547,6 +641,7 @@ juce::Result PresetManager::loadPreset(const PresetEntry& entry)
     {
         bool found = false;
         for (size_t i = 0; i < factoryEntries_.size(); ++i)
+        {
             if (factoryEntries_[i].isSameAs(entry))
             {
                 values = factoryValues_[i];
@@ -554,17 +649,24 @@ juce::Result PresetManager::loadPreset(const PresetEntry& entry)
                 found = true;
                 break;
             }
+        }
         if (!found)
+        {
             return juce::Result::fail("Factory preset not found");
+        }
     }
     else
     {
         PresetEntry meta;
         auto file = entry.file;
         if (file == juce::File())
+        {
             file = fileFor(entry.category, entry.name);
+        }
         if (auto r = parsePresetFile(file, meta, values); r.failed())
+        {
             return r;
+        }
         resolved.file = file;
         resolved.author = meta.author;
         resolved.factory = false;
@@ -579,8 +681,12 @@ juce::Result PresetManager::loadPreset(const PresetEntry& entry)
 juce::Result PresetManager::loadInit()
 {
     for (const auto& e : factoryEntries_)
+    {
         if (e.name == "Init")
+        {
             return loadPreset(e);
+        }
+    }
     return juce::Result::fail("Init preset not found");
 }
 
@@ -589,16 +695,20 @@ juce::Result PresetManager::step(int direction)
     ensureSynced();
     const auto list = getOrderedPresets();
     if (list.empty())
+    {
         return juce::Result::fail("No presets");
+    }
 
     const int n = static_cast<int>(list.size());
     int index = -1;
     for (int i = 0; i < n; ++i)
+    {
         if (list[static_cast<size_t>(i)].isSameAs(current_))
         {
             index = i;
             break;
         }
+    }
 
     juce::Result last = juce::Result::ok();
     for (int attempt = 0; attempt < n; ++attempt)
@@ -606,7 +716,9 @@ juce::Result PresetManager::step(int direction)
         index = index < 0 ? (direction > 0 ? 0 : n - 1) : ((index + direction) % n + n) % n;
         last = loadPreset(list[static_cast<size_t>(index)]);
         if (last.wasOk())
+        {
             return last;
+        }
     }
     return last;
 }
@@ -639,7 +751,9 @@ juce::String PresetManager::uniqueName(const juce::String& base, const juce::Str
 {
     auto candidate = base;
     for (int k = 2; fileFor(category, candidate).existsAsFile(); ++k)
+    {
         candidate = base + " " + juce::String(k);
+    }
     return candidate;
 }
 
@@ -652,7 +766,9 @@ juce::Result PresetManager::resolveCategory(const juce::String& category, juce::
     }
     out = sanitiseName(category);
     if (out.isEmpty())
+    {
         return juce::Result::fail("Invalid category name");
+    }
     return juce::Result::ok();
 }
 
@@ -673,11 +789,15 @@ juce::Result PresetManager::writePresetFile(const juce::File& dest, const Preset
     }
 
     if (!dest.getParentDirectory().createDirectory())
+    {
         return juce::Result::fail("Cannot create folder " + dest.getParentDirectory().getFullPathName());
+    }
 
     juce::TemporaryFile tmp(dest);
     if (!root.writeTo(tmp.getFile()) || !tmp.overwriteTargetFileWithTemporary())
+    {
         return juce::Result::fail("Cannot write " + dest.getFullPathName());
+    }
     return juce::Result::ok();
 }
 
@@ -688,15 +808,21 @@ juce::Result PresetManager::save()
 {
     ensureSynced();
     if (current_.factory)
+    {
         return juce::Result::fail("Factory presets are read-only. Use Save As.");
+    }
     const auto file =
         current_.file != juce::File() ? current_.file : fileFor(current_.category, current_.name);
     PresetEntry meta = current_;
     if (meta.author.isEmpty())
+    {
         meta.author = author_;
+    }
     const auto values = captureValues();
     if (auto r = writePresetFile(file, meta, values); r.failed())
+    {
         return r;
+    }
     meta.file = file;
     rescan();
     setCurrent(meta, values);
@@ -709,16 +835,22 @@ juce::Result PresetManager::saveAs(const juce::String& name, const juce::String&
     ensureSynced();
     const auto n = sanitiseName(name);
     if (n.isEmpty())
+    {
         return juce::Result::fail("Invalid preset name");
+    }
     juce::String cat;
     if (auto r = resolveCategory(category, cat); r.failed())
+    {
         return r;
+    }
 
     const auto dest = fileFor(cat, n);
     const bool isCurrentFile =
         !current_.factory && current_.file != juce::File() && samePath(current_.file, dest);
     if (dest.existsAsFile() && !overwrite && !isCurrentFile)
+    {
         return juce::Result::fail("A preset named \"" + n + "\" already exists in " + cat);
+    }
 
     PresetEntry meta;
     meta.name = n;
@@ -729,7 +861,9 @@ juce::Result PresetManager::saveAs(const juce::String& name, const juce::String&
 
     const auto values = captureValues();
     if (auto r = writePresetFile(dest, meta, values); r.failed())
+    {
         return r;
+    }
     rescan();
     setCurrent(meta, values);
     notify();
@@ -740,29 +874,43 @@ juce::Result PresetManager::rename(const juce::String& newName)
 {
     ensureSynced();
     if (current_.factory)
+    {
         return juce::Result::fail("Factory presets are read-only");
+    }
     const auto n = sanitiseName(newName);
     if (n.isEmpty())
+    {
         return juce::Result::fail("Invalid preset name");
+    }
     if (n == current_.name)
+    {
         return juce::Result::ok();
+    }
 
     const auto oldFile =
         current_.file != juce::File() ? current_.file : fileFor(current_.category, current_.name);
     PresetEntry meta;
     ParamValues values;
     if (auto r = parsePresetFile(oldFile, meta, values); r.failed())
+    {
         return juce::Result::fail("Preset file is missing or damaged: " + r.getErrorMessage());
+    }
 
     const auto dest = oldFile.getParentDirectory().getChildFile(n + kFileExtension);
     if (dest.existsAsFile() && !samePath(dest, oldFile))
+    {
         return juce::Result::fail("A preset named \"" + n + "\" already exists in " + current_.category);
+    }
 
     meta.name = n;
     if (auto r = writePresetFile(dest, meta, values); r.failed())
+    {
         return r;
+    }
     if (!samePath(dest, oldFile))
+    {
         oldFile.deleteFile();
+    }
 
     auto updated = current_;
     updated.name = n;
@@ -777,16 +925,22 @@ juce::Result PresetManager::deleteCurrent()
 {
     ensureSynced();
     if (current_.factory)
+    {
         return juce::Result::fail("Factory presets cannot be deleted");
+    }
     const auto file =
         current_.file != juce::File() ? current_.file : fileFor(current_.category, current_.name);
     if (file.existsAsFile() && !file.deleteFile())
+    {
         return juce::Result::fail("Cannot delete " + file.getFullPathName());
+    }
 
     const auto folder = file.getParentDirectory();
     if (folder != userFolder_ && folder.getParentDirectory() == userFolder_ &&
         folder.getNumberOfChildFiles(juce::File::findFilesAndDirectories) == 0)
+    {
         folder.deleteFile();
+    }
 
     rescan();
     return loadInit();
@@ -805,7 +959,9 @@ juce::Result PresetManager::duplicateCurrent()
     meta.file = fileFor(cat, name);
     const auto values = captureValues();
     if (auto r = writePresetFile(meta.file, meta, values); r.failed())
+    {
         return r;
+    }
     rescan();
     setCurrent(meta, values);
     notify();
@@ -817,17 +973,25 @@ juce::Result PresetManager::importPreset(const juce::File& file, PresetEntry* cr
     PresetEntry meta;
     ParamValues values;
     if (auto r = parsePresetFile(file, meta, values); r.failed())
+    {
         return r;
+    }
 
     auto name = sanitiseName(meta.name);
     if (name.isEmpty())
+    {
         name = sanitiseName(file.getFileNameWithoutExtension());
+    }
     if (name.isEmpty())
+    {
         name = "Imported preset";
+    }
 
     juce::String cat;
     if (resolveCategory(meta.category.isEmpty() ? juce::String("Imported") : meta.category, cat).failed())
+    {
         cat = "Imported";
+    }
 
     PresetEntry entry = meta;
     entry.name = uniqueName(name, cat); // never overwrite an existing preset
@@ -835,10 +999,14 @@ juce::Result PresetManager::importPreset(const juce::File& file, PresetEntry* cr
     entry.factory = false;
     entry.file = fileFor(cat, entry.name);
     if (auto r = writePresetFile(entry.file, entry, resolveValues(values)); r.failed())
+    {
         return r;
+    }
     rescan();
     if (created != nullptr)
+    {
         *created = entry;
+    }
     notify();
     return juce::Result::ok();
 }
@@ -848,10 +1016,14 @@ juce::Result PresetManager::exportCurrent(const juce::File& destination)
     ensureSynced();
     auto dest = destination;
     if (!dest.hasFileExtension(kFileExtension))
+    {
         dest = dest.withFileExtension(kFileExtension);
+    }
     PresetEntry meta = current_;
     if (meta.author.isEmpty())
+    {
         meta.author = author_;
+    }
     return writePresetFile(dest, meta, captureValues());
 }
 
@@ -862,7 +1034,9 @@ void PresetManager::selectSlot(Slot slot)
 {
     ensureSynced();
     if (slot == activeSlot_)
+    {
         return;
+    }
 
     auto& from = slots_[activeSlot_ == Slot::A ? 0u : 1u];
     from.valid = true;
@@ -873,7 +1047,9 @@ void PresetManager::selectSlot(Slot slot)
 
     auto& to = slots_[slot == Slot::A ? 0u : 1u];
     if (!to.valid)
+    {
         to = from; // first switch: both slots start identical
+    }
 
     activeSlot_ = slot;
     applyValues(to.values, &to.ref);

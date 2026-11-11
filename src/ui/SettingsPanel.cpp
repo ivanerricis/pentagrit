@@ -33,7 +33,9 @@ public:
     void restyle()
     {
         if (style)
+        {
             style(*this, pal(*this));
+        }
     }
     void parentHierarchyChanged() override
     {
@@ -115,11 +117,13 @@ public:
         slider_.setRange(lo, hi, step);
         slider_.setValue(value, juce::dontSendNotification);
         slider_.setScrollWheelEnabled(false);
-        slider_.onValueChange = [this, onChange]
+        slider_.onValueChange = [this, cb = std::move(onChange)]
         {
             repaint();
-            if (onChange)
-                onChange(slider_.getValue());
+            if (cb)
+            {
+                cb(slider_.getValue());
+            }
         };
         addAndMakeVisible(slider_);
     }
@@ -128,7 +132,9 @@ public:
     {
         auto b = getLocalBounds();
         if (left_.isNotEmpty())
+        {
             b.removeFromLeft(34);
+        }
         b.removeFromRight(right_.isNotEmpty() || format_ ? 58 : 0);
         slider_.setBounds(b);
     }
@@ -139,10 +145,14 @@ public:
         g.setColour(p.ink2);
         g.setFont(fonts::mono(10.5f));
         if (left_.isNotEmpty())
+        {
             g.drawText(left_, getLocalBounds().removeFromLeft(34), juce::Justification::centredLeft, false);
+        }
         const auto text = format_ ? format_(slider_.getValue()) : right_;
         if (text.isNotEmpty())
+        {
             g.drawText(text, getLocalBounds().removeFromRight(58), juce::Justification::centredRight, false);
+        }
     }
 
 private:
@@ -185,7 +195,9 @@ public:
     StyleSelector(const juce::StringArray& names, int selected, std::function<void(int)> onChange)
     {
         for (int i = 0; i < names.size(); ++i)
+        {
             addItem(names[i], i + 1);
+        }
         setSelectedItemIndex(selected, juce::dontSendNotification);
         setTitle("Style");
         setTooltip("Visual style of the plug-in window");
@@ -216,11 +228,15 @@ public:
     {
         i = juce::jlimit(0, labels_.size() - 1, i);
         if (i == selected_)
+        {
             return;
+        }
         selected_ = i;
         repaint();
         if (onChange_)
+        {
             onChange_(i);
+        }
     }
 
     void mouseDown(const juce::MouseEvent& e) override
@@ -231,11 +247,17 @@ public:
     bool keyPressed(const juce::KeyPress& k) override
     {
         if (k == juce::KeyPress::leftKey)
+        {
             choose(selected_ - 1);
+        }
         else if (k == juce::KeyPress::rightKey)
+        {
             choose(selected_ + 1);
+        }
         else
+        {
             return false;
+        }
         return true;
     }
     void paint(juce::Graphics& g) override
@@ -286,7 +308,9 @@ public:
         on_ = !on_;
         repaint();
         if (onChange_)
+        {
             onChange_(on_);
+        }
     }
     void mouseDown(const juce::MouseEvent&) override { toggle(); }
     bool keyPressed(const juce::KeyPress& k) override
@@ -349,10 +373,14 @@ public:
         auto b = getLocalBounds().reduced(14, 0);
         const int top = extra_ != nullptr ? kRowH : getHeight();
         if (control_ != nullptr)
+        {
             control_->setBounds(juce::Rectangle<int>(b.getRight() - controlW_, 0, controlW_, controlH_)
                                     .withCentre({b.getRight() - controlW_ / 2, top / 2}));
+        }
         if (extra_ != nullptr)
+        {
             extra_->setBounds(b.getX(), kRowH - 4, b.getWidth(), extraH_);
+        }
     }
 
     void paint(juce::Graphics& g) override
@@ -416,7 +444,9 @@ public:
     {
         int h = 4;
         for (const auto& i : items_)
+        {
             h += i.height + kRowGap;
+        }
         return h + 8;
     }
     void resized() override
@@ -455,7 +485,9 @@ SettingsPanel::SettingsPanel(PentagritAudioProcessor& processor)
     done_.onClick = [this]
     {
         if (onClose)
+        {
             onClose();
+        }
     };
     viewport_.setScrollBarsShown(true, false);
     viewport_.setScrollBarThickness(8);
@@ -511,13 +543,17 @@ void SettingsPanel::changeListenerCallback(juce::ChangeBroadcaster* source)
         return;
     }
     if (guard_ == 0)
+    {
         rebuildPage(); // changed from elsewhere (reset, another instance, file edit)
+    }
 }
 
 void SettingsPanel::lookAndFeelChanged()
 {
     if (viewport_.getViewedComponent() != nullptr)
+    {
         rebuildPage();
+    }
 }
 
 void SettingsPanel::timerCallback()
@@ -528,7 +564,9 @@ void SettingsPanel::timerCallback()
 void SettingsPanel::updateLatencyText()
 {
     if (latencyLabel_ == nullptr)
+    {
         return;
+    }
     const int lat = processor_.getMeters().latencySamples.load(std::memory_order_relaxed);
     const double sr = processor_.getSampleRate();
     auto& apvts = processor_.getAPVTS();
@@ -537,11 +575,17 @@ void SettingsPanel::updateLatencyText()
     const auto lookahead = apvts.getParameter(pid::lookahead)->getCurrentValueAsText();
     juce::String text = "Live (OS " + os + ", " + phase + ", lookahead " + lookahead.toLowerCase() + "): ";
     if (sr > 0.0)
+    {
         text << juce::String(lat * 1000.0 / sr, 2) << " ms  (" << lat << " smp)";
+    }
     else
+    {
         text << lat << " smp";
+    }
     if (latencyLabel_->getText() != text)
+    {
         latencyLabel_->setText(text, juce::dontSendNotification);
+    }
 }
 
 void SettingsPanel::rebuildPage()
@@ -576,7 +620,9 @@ void SettingsPanel::rebuildPage()
 void SettingsPanel::layoutPage()
 {
     if (auto* page = dynamic_cast<Page*>(viewport_.getViewedComponent()))
+    {
         page->setSize(juce::jmax(100, viewport_.getMaximumVisibleWidth()), page->totalHeight());
+    }
 }
 
 void SettingsPanel::resized()
@@ -620,7 +666,9 @@ void SettingsPanel::paint(juce::Graphics& g)
 void SettingsPanel::mouseDown(const juce::MouseEvent& e)
 {
     if (!card_.contains(e.getPosition()) && onClose)
+    {
         onClose();
+    }
 }
 
 bool SettingsPanel::keyPressed(const juce::KeyPress& k)
@@ -628,7 +676,9 @@ bool SettingsPanel::keyPressed(const juce::KeyPress& k)
     if (k == juce::KeyPress::escapeKey)
     {
         if (onClose)
+        {
             onClose();
+        }
         return true;
     }
     return false;
@@ -644,7 +694,9 @@ template <class T> int indexOf(std::initializer_list<T> values, T v, int fallbac
     for (auto x : values)
     {
         if (x == v)
+        {
             return i;
+        }
         ++i;
     }
     return fallback;
@@ -679,7 +731,9 @@ void SettingsPanel::buildInterface(Page& page)
     {
         juce::StringArray names;
         for (int i = 0; i < kNumStyles; ++i)
+        {
             names.add(styleName(static_cast<Style>(i)));
+        }
         addRow("Style", "Colour scheme and shapes of the whole window.",
                std::make_unique<StyleSelector>(
                    names, static_cast<int>(s.style),
@@ -699,7 +753,8 @@ void SettingsPanel::buildInterface(Page& page)
     page.add(heading("Controls"), 28);
     addRow("Knob drag mode", {},
            seg({"Vertical", "Circular"}, s.knobMode == KnobMode::vertical ? 0 : 1,
-               [this](int i) {
+               [this](int i)
+               {
                    apply([i](UserSettings& u)
                          { u.knobMode = i == 0 ? KnobMode::vertical : KnobMode::circular; });
                }),
@@ -708,8 +763,12 @@ void SettingsPanel::buildInterface(Page& page)
         static constexpr float steps[] = {0.0f, 0.1f, 0.5f, 1.0f};
         int cur = 0;
         for (int k = 0; k < 4; ++k)
+        {
             if (std::abs(steps[k] - s.valueStepDb) < 1.0e-4f)
+            {
                 cur = k;
+            }
+        }
         addRow("Value step",
                "Drag step of the dB knobs (gain, attack, sustain, drive). Hold Shift for fine adjustment; "
                "typed values are never rounded.",
@@ -811,10 +870,14 @@ juce::String SettingsPanel::startupLabel() const
 {
     const auto& s = settings_.get();
     if (s.startupMode == StartupMode::init)
+    {
         return "Init";
+    }
     if (s.startupMode == StartupMode::specific && s.startup.isValid())
+    {
         return juce::String(s.startup.factory ? "Factory" : "User") + " / " + s.startup.category + " / " +
                s.startup.name;
+    }
     return "Last used";
 }
 
@@ -829,7 +892,9 @@ void SettingsPanel::buildPresets(Page& page)
         auto commit = [this]
         {
             if (folderEditor_ == nullptr)
+            {
                 return;
+            }
             const auto text = folderEditor_->getText().trim();
             const bool isDefault =
                 text.isEmpty() || juce::File(text) == PresetManager::getDefaultUserFolder();
@@ -865,10 +930,14 @@ void SettingsPanel::chooseFolder()
                           {
                               const auto dir = fc.getResult();
                               if (safe == nullptr || dir == juce::File())
+                              {
                                   return;
+                              }
                               safe->apply([&](UserSettings& u) { u.presetFolder = dir.getFullPathName(); });
                               if (safe->folderEditor_ != nullptr)
+                              {
                                   safe->folderEditor_->setText(dir.getFullPathName(), false);
+                              }
                               safe->say("User preset folder: " + dir.getFullPathName());
                           });
 }
@@ -887,16 +956,22 @@ void SettingsPanel::showStartupMenu(juce::Component& target)
     auto setMode = [safe](StartupMode mode, PresetRef ref)
     {
         if (safe == nullptr)
+        {
             return;
+        }
         safe->apply(
             [&](UserSettings& u)
             {
                 u.startupMode = mode;
                 if (mode == StartupMode::specific)
+                {
                     u.startup = ref;
+                }
             });
         if (safe->startupButton_ != nullptr)
+        {
             safe->startupButton_->setButtonText(safe->startupLabel() + "  v");
+        }
     };
     const auto& s = settings_.get();
     auto& presets = processor_.getPresetManager();
@@ -969,7 +1044,9 @@ void SettingsPanel::buildAbout(Page& page)
     {
         auto row = std::make_unique<Row>(title, desc, false);
         if (c != nullptr)
+        {
             row->setControl(std::move(c), w, 28);
+        }
         page.add(std::move(row), h);
     };
 
@@ -1013,7 +1090,9 @@ void SettingsPanel::buildAbout(Page& page)
                                             [safeButton]
                                             {
                                                 if (safeButton != nullptr)
+                                                {
                                                     safeButton->setButtonText("Copy debug info");
+                                                }
                                             });
             }
         };
@@ -1037,7 +1116,9 @@ void SettingsPanel::buildAbout(Page& page)
                                                {
                                                    apply([on](UserSettings& u) { u.checkUpdates = on; });
                                                    if (on)
+                                                   {
                                                        settings_.checkForUpdatesIfDue();
+                                                   }
                                                });
         textRow("Check for updates once a day",
                 "Off by default. When on, Pentagrit asks GitHub for the latest release when the editor "
@@ -1047,7 +1128,9 @@ void SettingsPanel::buildAbout(Page& page)
         button->onClick = [this]
         {
             if (settings_.checkForUpdatesNow())
+            {
                 say("Checking...");
+            }
         };
         textRow("Check now",
                 "Sends one request to api.github.com with the name \"Pentagrit\" as user agent. No "

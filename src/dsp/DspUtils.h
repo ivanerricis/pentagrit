@@ -92,7 +92,9 @@ inline float fastSinHalfPi(float u) noexcept
 inline float timeToCoeff(double seconds, double sampleRate) noexcept
 {
     if (seconds <= 0.0 || sampleRate <= 0.0)
+    {
         return 0.0f;
+    }
     return static_cast<float>(std::exp(-1.0 / (seconds * sampleRate)));
 }
 

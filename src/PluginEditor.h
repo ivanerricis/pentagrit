@@ -77,7 +77,9 @@ private:
         void resized() override
         {
             if (onResized)
+            {
                 onResized();
+            }
         }
         void paint(juce::Graphics& g) override { g.fillAll(ui::pal(*this).bg0); }
     };

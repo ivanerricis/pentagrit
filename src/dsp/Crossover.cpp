@@ -156,9 +156,13 @@ template <typename State> inline void flush(State& st) noexcept
     for (int l = 0; l < 2; ++l)
     {
         if (std::abs(st.ic1[l]) < kFlushThreshold)
+        {
             st.ic1[l] = 0.0;
+        }
         if (std::abs(st.ic2[l]) < kFlushThreshold)
+        {
             st.ic2[l] = 0.0;
+        }
     }
 }
 
@@ -192,7 +196,9 @@ void Crossover::setProcessingRate(double procRate) noexcept
 void Crossover::reset() noexcept
 {
     for (auto& ch : channels_)
+    {
         ch = ChannelState{};
+    }
     snap(splitSmoother_);
     snap(drySmoother_);
 }
@@ -205,7 +211,9 @@ void Crossover::setNumBands(int numBands) noexcept
     effective_ = enforceOrdering(requested_, numBands_, baseRate_);
     updateTargets();
     if (changed)
+    {
         reset();
+    }
 }
 
 void Crossover::setFrequencies(const std::array<float, 4>& hz) noexcept
@@ -237,26 +245,37 @@ std::array<float, 4> Crossover::enforceOrdering(std::array<float, 4> hz, int num
     // Forward pass pushes up, backward pass pulls down from the ceiling, final forward pass restores the
     // floor.
     for (int i = 1; i < active; ++i)
-        f[static_cast<size_t>(i)] =
-            std::max(f[static_cast<size_t>(i)], f[static_cast<size_t>(i - 1)] * ratio);
-    f[static_cast<size_t>(active - 1)] = std::min(f[static_cast<size_t>(active - 1)], maxHz);
+    {
+        const int prev = i - 1;
+        f[static_cast<size_t>(i)] = std::max(f[static_cast<size_t>(i)], f[static_cast<size_t>(prev)] * ratio);
+    }
+    const int last = active - 1;
+    f[static_cast<size_t>(last)] = std::min(f[static_cast<size_t>(last)], maxHz);
     for (int i = active - 2; i >= 0; --i)
-        f[static_cast<size_t>(i)] =
-            std::min(f[static_cast<size_t>(i)], f[static_cast<size_t>(i + 1)] / ratio);
+    {
+        const int next = i + 1;
+        f[static_cast<size_t>(i)] = std::min(f[static_cast<size_t>(i)], f[static_cast<size_t>(next)] / ratio);
+    }
     f[0] = std::max(f[0], kMinHz);
     for (int i = 1; i < active; ++i)
-        f[static_cast<size_t>(i)] =
-            std::max(f[static_cast<size_t>(i)], f[static_cast<size_t>(i - 1)] * ratio);
+    {
+        const int prev = i - 1;
+        f[static_cast<size_t>(i)] = std::max(f[static_cast<size_t>(i)], f[static_cast<size_t>(prev)] * ratio);
+    }
 
     for (int i = 0; i < active; ++i)
+    {
         hz[static_cast<size_t>(i)] = static_cast<float>(f[static_cast<size_t>(i)]);
+    }
     return hz;
 }
 
 void Crossover::updateTargets() noexcept
 {
     for (size_t i = 0; i < 4; ++i)
+    {
         targetLogHz_[i] = std::log(std::max(static_cast<double>(effective_[i]), kMinHz));
+    }
     smoothAlpha_ =
         1.0 - std::exp(-static_cast<double>(kCoefInterval) / (kSmoothSeconds * std::max(procRate_, 1.0)));
 }
@@ -277,7 +296,9 @@ void Crossover::advance(Smoother& s) const noexcept
     {
         const double diff = targetLogHz_[i] - s.logHz[i];
         if (diff == 0.0)
+        {
             continue;
+        }
         s.logHz[i] = std::abs(diff) < 1.0e-9 ? targetLogHz_[i] : s.logHz[i] + diff * smoothAlpha_;
         computeCoefs(s.coefs[i], s.logHz[i], procRate_);
     }
@@ -313,17 +334,21 @@ void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& 
         const auto& coefs = splitSmoother_.coefs;
         VCoefs vc[4];
         for (int s = 0; s < stages; ++s)
+        {
             vc[s] = vcoefs(coefs[static_cast<size_t>(s)]);
-        ChannelState& st = channels_[static_cast<size_t>(ch0 / 2)];
+        }
+        const int pair = ch0 / 2;
+        const int ch1 = ch0 + 1;
+        ChannelState& st = channels_[static_cast<size_t>(pair)];
         const float* src0 = in.getChannelPointer(static_cast<size_t>(ch0));
-        const float* src1 = two ? in.getChannelPointer(static_cast<size_t>(ch0 + 1)) : src0;
+        const float* src1 = two ? in.getChannelPointer(static_cast<size_t>(ch1)) : src0;
         float* out0[kMaxBands];
         float* out1[kMaxBands];
         for (int b = 0; b < numBands_; ++b)
         {
             out0[b] = bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0));
             out1[b] =
-                two ? bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch0 + 1)) : nullptr;
+                two ? bands[static_cast<size_t>(b)].getChannelPointer(static_cast<size_t>(ch1)) : nullptr;
         }
 
         for (int i = start; i < start + len; ++i)
@@ -339,15 +364,21 @@ void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& 
                 const D2 high = highpass(st.hp2[si], vc[s], hp1);
                 // Phase-match this band to the later splits.
                 for (int t = s + 1; t < stages; ++t)
+                {
                     low = allpass(st.comp[si][static_cast<size_t>(t)], vc[t], low);
+                }
                 out0[s][i] = static_cast<float>(lane0(low));
                 if (two)
+                {
                     out1[s][i] = static_cast<float>(lane1(low));
+                }
                 x = high;
             }
             out0[stages][i] = static_cast<float>(lane0(x));
             if (two)
+            {
                 out1[stages][i] = static_cast<float>(lane1(x));
+            }
         }
     };
 
@@ -355,20 +386,32 @@ void Crossover::split(const juce::dsp::AudioBlock<const float>& in, BandBlocks& 
                  [&](int start, int len)
                  {
                      for (int ch = 0; ch < numCh; ch += 2)
+                     {
                          run(ch, start, len);
+                     }
                  });
 
     for (auto& st : channels_)
     {
         for (auto& f : st.lp1)
+        {
             flush(f);
+        }
         for (auto& f : st.lp2)
+        {
             flush(f);
+        }
         for (auto& f : st.hp2)
+        {
             flush(f);
+        }
         for (auto& a : st.comp)
+        {
             for (auto& f : a)
+            {
                 flush(f);
+            }
+        }
     }
 }
 
@@ -383,18 +426,26 @@ void Crossover::processAllpassChain(const juce::dsp::AudioBlock<float>& io) noex
         const bool two = ch0 + 1 < numCh;
         VCoefs vc[4];
         for (int s = 0; s < stages; ++s)
+        {
             vc[s] = vcoefs(drySmoother_.coefs[static_cast<size_t>(s)]);
-        ChannelState& st = channels_[static_cast<size_t>(ch0 / 2)];
+        }
+        const int pair = ch0 / 2;
+        const int ch1 = ch0 + 1;
+        ChannelState& st = channels_[static_cast<size_t>(pair)];
         float* d0 = io.getChannelPointer(static_cast<size_t>(ch0));
-        float* d1 = two ? io.getChannelPointer(static_cast<size_t>(ch0 + 1)) : d0;
+        float* d1 = two ? io.getChannelPointer(static_cast<size_t>(ch1)) : d0;
         for (int i = start; i < start + len; ++i)
         {
             D2 x = make(static_cast<double>(d0[i]), two ? static_cast<double>(d1[i]) : 0.0);
             for (int s = 0; s < stages; ++s)
+            {
                 x = allpass(st.dry[static_cast<size_t>(s)], vc[s], x);
+            }
             d0[i] = static_cast<float>(lane0(x));
             if (two)
+            {
                 d1[i] = static_cast<float>(lane1(x));
+            }
         }
     };
 
@@ -402,11 +453,17 @@ void Crossover::processAllpassChain(const juce::dsp::AudioBlock<float>& io) noex
                  [&](int start, int len)
                  {
                      for (int ch = 0; ch < numCh; ch += 2)
+                     {
                          run(ch, start, len);
+                     }
                  });
 
     for (auto& st : channels_)
+    {
         for (auto& f : st.dry)
+        {
             flush(f);
+        }
+    }
 }
 } // namespace pentagrit
