@@ -37,7 +37,7 @@ jobs:
         run: |
           all='[
             {"name":"windows","os":"windows-2022","preset":"ci-windows","package":"windows-x64","tools_os":"Windows"},
-            {"name":"macos","os":"macos-14","preset":"ci-macos","package":"macos-universal","tools_os":"macOS"},
+            {"name":"macos","os":"macos-15","preset":"ci-macos","package":"macos-universal","tools_os":"macOS"},
             {"name":"linux","os":"ubuntu-22.04","preset":"ci-linux","package":"linux-x64","tools_os":"Linux"}
           ]'
           matrix="$(jq -c --argjson want "$PLATFORMS" '{include: map(select(.name as $n | $want | index($n)))}' <<<"$all")"
