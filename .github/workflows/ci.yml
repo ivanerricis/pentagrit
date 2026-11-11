@@ -114,7 +114,7 @@ jobs:
           exe="$(find build/ci-linux-asan -type f -name PentagritTests -print -quit)"
           cat > run_each.sh <<'SH'
           exe="$1"
-          "$exe" --list-test-names-only '~[allocation]' | sed '/^$/d' | while IFS= read -r t; do
+          "$exe" --list-tests --verbosity quiet '~[allocation]' | sed '/^$/d' | while IFS= read -r t; do
             out="$("$exe" "$t" 2>&1)" || echo "FAILED: $t"
             echo "$out" | grep -E 'JUCE Assertion|runtime error|Sanitizer|Leaked objects' | sed "s|^|[$t] |"
           done
