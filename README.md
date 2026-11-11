@@ -2,24 +2,31 @@
 
 Multiband transient shaper and saturator plugin (VST3, CLAP, AU, Standalone) built with JUCE 8 and C++20.
 
-Status: early development. License: AGPL-3.0-or-later. The repository is currently private.
+Status: pre-release. The latest published build is the pre-release `v0.1.0-rc2`; there is no stable release yet. The repository is public. License: AGPL-3.0-or-later.
 
 ## Features
 
 - 3 to 5 band multiband processing with Linkwitz-Riley 4th order (LR4) crossovers (default 3 bands, 120 / 1200 / 3500 / 8000 Hz).
-- Per-band transient shaper (attack and sustain, adjustable speed).
-- Per-band saturation with several curves (tanh, soft clip, tube, wavefold, hard clip) and drive.
+- Per-band transient shaper (attack and sustain, adjustable speed), with an optional lookahead (Off / 1 / 2 / 5 ms, adds its time to the reported latency).
+- Per-band saturation with several curves (tanh, soft clip, tube, wavefold, hard clip) and drive. Hard clip and wavefold are antialiased (first-order ADAA).
+- Optional drive compensation: keeps the level of quiet signals constant while the drive is raised.
 - Auto-gain, global dry/wet mix with phase-matched dry path, per-band mute, solo and bypass.
 - Oversampling (linear or minimum phase) with a separate render quality for offline bounces.
-- Factory and user presets.
+- Factory and user presets, A/B compare.
+- Undo and redo for parameter changes (top bar buttons, Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl+Y).
+- Typed values: double-click a knob to type a value (for example `50 %`, `1.2k`, `-3`); Ctrl+click (Cmd+click on macOS) resets to the default.
+- Settings panel: zoom, six visual styles, Full or Compact layout, knob behaviour and value step, meters, preset folder and startup preset.
+- Opt-in update check against GitHub Releases (Windows and macOS, off by default, at most once a day). It only reports stable releases.
 
 Formats: VST3 and CLAP on Windows, macOS and Linux; AU on macOS; plus a Standalone app.
 
 ## Install
 
+Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). Until the first stable release only pre-releases (currently `v0.1.0-rc2`) are available, and GitHub's "latest release" link does not point to pre-releases, so pick the version from the list.
+
 ### Windows (installer)
 
-Download `Pentagrit-vX.Y.Z-windows-setup.exe` from the [latest release](https://github.com/ivanerricis/pentagrit/releases/latest), run it (administrator rights required), and choose the components: VST3, CLAP and/or the Standalone app. The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC": click **More info**, then **Run anyway**. To uninstall, use **Settings, Apps, Installed apps, Pentagrit**.
+Download `Pentagrit-vX.Y.Z-windows-setup.exe` from the release you want, run it (administrator rights required), and choose the components: VST3, CLAP and/or the Standalone app. The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC": click **More info**, then **Run anyway**. To uninstall, use **Settings, Apps, Installed apps, Pentagrit**.
 
 ### macOS (installer)
 

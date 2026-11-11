@@ -28,8 +28,30 @@ On macOS also run `auval`; for CLAP use clap-validator. CI runs all of these.
 
 ## Formatting and lint
 
-`clang-format` (v18 in CI) with `.clang-format`; `clang-tidy` is advisory. See `CONTRIBUTING.md`.
+`clang-format` (v18 in CI) with `.clang-format`. See `CONTRIBUTING.md`.
+
+`clang-tidy` (job `clang-tidy (advisory)`) is advisory and needs a compile database plus the generated binary-data headers (`PentagritUiData.h`, `PentagritPresetData.h`). Build the targets `PentagritUiAssets` and `PentagritPresetData` before running it, as the CI job does:
+
+```
+cmake --preset ci-linux -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPENTAGRIT_BUILD_TESTS=OFF
+cmake --build build/ci-linux --target PentagritUiAssets PentagritPresetData
+git ls-files 'src/*.cpp' | xargs clang-tidy-18 -p build/ci-linux --quiet --header-filter="^$PWD/src/.*"
+```
+
+## Sanitizers
+
+The `ci-linux-asan` preset builds a Debug configuration with AddressSanitizer and UndefinedBehaviorSanitizer (JUCE `jassert`s stay active). The CI job `asan-ubsan (advisory)` runs the test binary under `xvfb-run` with `~[allocation]`: the allocation tests replace the global `operator new`/`delete` and conflict with ASan, and ctest cannot filter on Catch2 tags, so the binary is started directly. The job is advisory (`continue-on-error`) until it is clean.
+
+```
+cmake --preset ci-linux-asan
+cmake --build --preset ci-linux-asan --parallel
+build/ci-linux-asan/<path>/PentagritTests '~[allocation]'
+```
+
+## macOS in CI
+
+macOS is built only on pushes to `main`, manual runs, or pull requests labelled `ci:macos` (macOS runners are slow and queue-limited). Add the label when a change touches platform-specific code.
 
 ## Architecture
 
-`docs/ARCHITECTURE.md` describes the DSP chain, the 63 parameters and the frozen C++ contracts. `docs/PLAN.md` holds the work plan. Parameter IDs are immutable (see `CONTRIBUTING.md`).
+`docs/ARCHITECTURE.md` describes the DSP chain, the 65 parameters, state versioning, undo and the frozen C++ contracts. `docs/PLAN.md` holds the work plan. Parameter IDs are immutable (see `CONTRIBUTING.md`).
