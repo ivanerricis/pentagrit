@@ -21,7 +21,7 @@ CI (Windows + Linux build, tests, pluginval 10, clang-format 18) is green; clang
 5. Make the `asan-ubsan (advisory)` job required (drop `continue-on-error` in `ci.yml`) once it is clean.
 6. Apply the branch ruleset on `main` (not applied yet; `docs/BRANCH_PROTECTION.md` has the command and the real check names).
 7. Code signing / notarisation (Windows signing, Apple notarisation, `docs/MACOS_SIGNING.md`).
-8. Release `v0.1.0-rc3`, then `v0.1.0` (tag must equal the CMake version). `docs/RELEASING.md` still says the repository is private: update it before the release.
+8. Release `v0.1.0-rc3`, then `v0.1.0` (tag must equal the CMake version).
 9. Verify the product name "Pentagrit" is free of trademark conflicts before the stable release.
 10. Cleanup: remove stale worktrees (`git worktree list`, `git worktree remove`) and merged branches.
 
