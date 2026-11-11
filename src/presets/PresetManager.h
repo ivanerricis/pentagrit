@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <map>
 #include <vector>
@@ -55,6 +56,10 @@ public:
     // userFolder: root of the user presets; default is the platform folder (getDefaultUserFolder()).
     explicit PresetManager(juce::AudioProcessorValueTreeState& apvts, const juce::File& userFolder = {});
     ~PresetManager() override;
+
+    // Called whenever the whole state is replaced (preset load, A/B switch, host state restore); the
+    // processor uses it to clear the undo history. May be called from any thread.
+    void setOnStateReplaced(std::function<void()> fn) { onStateReplaced_ = std::move(fn); }
 
     // ---- Folders ----
     static juce::File getDefaultUserFolder();
@@ -159,6 +164,7 @@ private:
     bool needsSync_ = false;
     bool lastModified_ = false;
     int suppress_ = 0;
+    std::function<void()> onStateReplaced_;
 
     Slot activeSlot_ = Slot::A;
     std::array<SlotData, 2> slots_;

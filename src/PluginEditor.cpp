@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 
 #include <cmath>
+#include <optional>
 
 namespace pentagrit
 {
@@ -36,6 +37,7 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
 {
     auto& apvts = processor_.getAPVTS();
     setTitle("Pentagrit");
+    setWantsKeyboardFocus(true); // clicks on controls that take no focus land here (undo / redo shortcuts)
     setLookAndFeel(&lnf_);
 
     addAndMakeVisible(content_);
@@ -57,6 +59,8 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     presetBar_->onMessage = [this](const juce::String& m) { showToast(m); };
     topBar_.presetSlot().addAndMakeVisible(*presetBar_);
     topBar_.presetSlot().resized();
+    topBar_.onUndo = [this] { undo(); };
+    topBar_.onRedo = [this] { redo(); };
     topBar_.onSettingsClicked = [this]
     {
         if (isSettingsOpen())
@@ -190,13 +194,66 @@ void PentagritAudioProcessorEditor::openSettings()
     settingsPanel_->showTab(settingsPanel_->currentTab());
     settingsPanel_->setVisible(true);
     settingsPanel_->toFront(true);
-    settingsPanel_->grabKeyboardFocus();
+    if (settingsPanel_->isShowing()) // grabKeyboardFocus() asserts when the editor is not on screen
+        settingsPanel_->grabKeyboardFocus();
 }
 
 void PentagritAudioProcessorEditor::closeSettings()
 {
     if (settingsPanel_ != nullptr)
         settingsPanel_->setVisible(false); // kept (hidden): this may run from one of its own callbacks
+}
+
+bool PentagritAudioProcessorEditor::undo()
+{
+    auto& um = processor_.getUndoManager();
+    const bool done = um.undo();
+    updateHistoryButtons();
+    return done;
+}
+
+bool PentagritAudioProcessorEditor::redo()
+{
+    auto& um = processor_.getUndoManager();
+    const bool done = um.redo();
+    updateHistoryButtons();
+    return done;
+}
+
+void PentagritAudioProcessorEditor::updateHistoryButtons()
+{
+    auto& um = processor_.getUndoManager();
+    topBar_.setHistoryState(um.canUndo(), um.canRedo());
+}
+
+bool PentagritAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
+{
+    // Never while a text field has the focus (typed value, preset name: they have their own editing) and not
+    // behind the settings overlay.
+    if (isSettingsOpen() ||
+        dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent()) != nullptr)
+        return false;
+
+    const auto mods = key.getModifiers();
+    if (mods.isAltDown() || !(mods.isCommandDown() || mods.isCtrlDown()))
+        return false;
+
+    const int code = key.getKeyCode();
+    const int letter =
+        code < 128
+            ? static_cast<int>(juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(code)))
+            : code;
+    if (letter == 'Z')
+    {
+        mods.isShiftDown() ? redo() : undo();
+        return true;
+    }
+    if (letter == 'Y' && !mods.isShiftDown())
+    {
+        redo();
+        return true;
+    }
+    return false;
 }
 
 void PentagritAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster*)
@@ -235,7 +292,11 @@ void PentagritAudioProcessorEditor::applyNumBands(int n, bool)
 
     if (raised)
     {
-        // Push the handles up so that they keep the 1/3 octave spacing.
+        // Push the handles up so that they keep the 1/3 octave spacing. Raised by the user (a gesture on the
+        // band selector) the pushes are part of that undo step; raised by the host they are not undoable.
+        std::optional<PentagritAudioProcessor::ScopedUndoPause> pause;
+        if (!processor_.isUiGestureOpen())
+            pause.emplace(processor_);
         auto& apvts = processor_.getAPVTS();
         float prev = apvts.getRawParameterValue(pid::xover[0])->load();
         for (size_t i = 1; i < pid::xover.size(); ++i)
@@ -331,6 +392,7 @@ void PentagritAudioProcessorEditor::refreshNow()
         s.tick(dt);
     }
     topBar_.tick();
+    updateHistoryButtons();
     if (!isCompact())
         crossover_.tick();
     global_.tick(dt);

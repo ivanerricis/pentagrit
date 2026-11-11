@@ -430,6 +430,8 @@ void PresetManager::applyValues(const ParamValues& partial, const PresetEntry* r
         tree.setProperty(kPropFactory, ref->factory, nullptr);
     }
     apvts_.replaceState(tree);
+    if (onStateReplaced_)
+        onStateReplaced_();
 
     --suppress_;
 }
@@ -498,6 +500,8 @@ void PresetManager::valueTreePropertyChanged(juce::ValueTree& tree, const juce::
 void PresetManager::valueTreeRedirected(juce::ValueTree&)
 {
     // replaceState() (e.g. the DAW restoring a project) swaps the whole tree.
+    if (onStateReplaced_)
+        onStateReplaced_();
     if (suppress_ == 0)
     {
         needsSync_ = true;
