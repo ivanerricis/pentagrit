@@ -2,9 +2,9 @@
 #include "ui/Fonts.h"
 
 #include <PentagritUiData.h>
+#include <juce_events/juce_events.h>
 #include <atomic>
 #include <memory>
-#include <mutex>
 
 namespace pentagrit::ui::fonts
 {
@@ -102,13 +102,49 @@ struct Faces
 
 std::atomic<int> g_style{0};
 
-const Faces& faces()
+// Owns the typefaces. It is destroyed by juce::DeletedAtShutdown while JUCE is still alive (a static cache
+// would be destroyed at process exit, after JUCE has shut down, and its Typeface destructors would touch
+// destroyed JUCE state). It is re-created on demand if fonts are requested again after a shutdown.
+class FontCache final : private juce::DeletedAtShutdown
 {
-    static std::once_flag flags[kNumStyles];
-    static std::unique_ptr<Faces> cache[kNumStyles];
-    const int i = juce::jlimit(0, kNumStyles - 1, g_style.load());
-    std::call_once(flags[i], [i] { cache[i] = std::make_unique<Faces>(static_cast<Style>(i)); });
-    return *cache[i];
+public:
+    // The returned pointer keeps its typefaces alive through reference counting, so callers can keep using
+    // it even if the cache is deleted meanwhile.
+    static std::shared_ptr<const Faces> get(int style)
+    {
+        const juce::SpinLock::ScopedLockType lock(lockObject());
+        if (instance == nullptr)
+            instance = new FontCache();
+        auto& slot = instance->faces[style];
+        if (slot == nullptr)
+            slot = std::make_shared<const Faces>(static_cast<Style>(style));
+        return slot;
+    }
+
+private:
+    FontCache() = default;
+
+    ~FontCache() override
+    {
+        const juce::SpinLock::ScopedLockType lock(lockObject());
+        if (instance == this)
+            instance = nullptr;
+    }
+
+    // Function-local static with a trivial destructor, safe to use during teardown.
+    static juce::SpinLock& lockObject()
+    {
+        static juce::SpinLock l;
+        return l;
+    }
+
+    static inline FontCache* instance = nullptr;
+    std::shared_ptr<const Faces> faces[kNumStyles];
+};
+
+std::shared_ptr<const Faces> faces()
+{
+    return FontCache::get(juce::jlimit(0, kNumStyles - 1, g_style.load()));
 }
 
 juce::Font make(const juce::Typeface::Ptr& face, const juce::String& fallbackFamily, bool bold, float px,
@@ -137,27 +173,27 @@ Style currentStyle() noexcept
 
 bool embeddedFontsLoaded()
 {
-    return faces().ok;
+    return faces()->ok;
 }
 
 juce::Font sans(float px, Weight w, float tracking)
 {
-    const auto& f = faces();
-    return make(f.ok ? f.sans[static_cast<int>(w)] : nullptr, "Segoe UI", w == Weight::semiBold, px,
+    const auto f = faces();
+    return make(f->ok ? f->sans[static_cast<int>(w)] : nullptr, "Segoe UI", w == Weight::semiBold, px,
                 tracking);
 }
 
 juce::Font display(float px, Weight w, float tracking)
 {
-    const auto& f = faces();
-    return make(f.ok ? f.display[static_cast<int>(w)] : nullptr, "Segoe UI", w == Weight::semiBold, px,
+    const auto f = faces();
+    return make(f->ok ? f->display[static_cast<int>(w)] : nullptr, "Segoe UI", w == Weight::semiBold, px,
                 tracking);
 }
 
 juce::Font mono(float px, Weight w, float tracking)
 {
-    const auto& f = faces();
-    return make(f.ok ? f.mono[w == Weight::regular ? 0 : 1] : nullptr, "Consolas", w == Weight::semiBold, px,
-                tracking);
+    const auto f = faces();
+    return make(f->ok ? f->mono[w == Weight::regular ? 0 : 1] : nullptr, "Consolas", w == Weight::semiBold,
+                px, tracking);
 }
 } // namespace pentagrit::ui::fonts
