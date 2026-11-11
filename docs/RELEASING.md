@@ -2,7 +2,7 @@
 
 ## Licence warning (read first)
 
-Pentagrit is AGPL-3.0-or-later and links JUCE under the AGPLv3 option. **Distributing binaries publicly (GitHub Release, website, forum) obliges you to make the corresponding source available** to the recipients. The repository is currently private: before the first public binary, either make the repository public or obtain a commercial JUCE licence and relicense accordingly. Decide this before `v0.1.0`.
+Pentagrit is AGPL-3.0-or-later and links JUCE under the AGPLv3 option. **Distributing binaries publicly (GitHub Release, website, forum) obliges you to make the corresponding source available** to the recipients. The repository is public (since 2026-10-29), which satisfies this. A closed-source distribution would need a commercial JUCE licence and a relicense.
 
 ## Versioning
 

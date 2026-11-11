@@ -12,7 +12,7 @@ gh repo edit ivanerricis/pentagrit \
 
 ## Ruleset via `gh api`
 
-Adjust the check names to those emitted by the CI workflows (see the check names on a recent PR).
+The required contexts are the check names shown by `gh pr checks <number>` on a recent PR. For reusable workflows the name is `<caller job> / <called job>`, so the build checks are `build (windows) / build (windows)` and `build (linux) / build (linux)` (the `plan` jobs and `build-macos` are not required).
 
 ```
 gh api -X POST repos/ivanerricis/pentagrit/rulesets --input - <<'JSON'
@@ -37,8 +37,8 @@ gh api -X POST repos/ivanerricis/pentagrit/rulesets --input - <<'JSON'
         "required_status_checks": [
           { "context": "clang-format 18" },
           { "context": "PR title (conventional commit)" },
-          { "context": "build / windows" },
-          { "context": "build / linux" }
+          { "context": "build (windows) / build (windows)" },
+          { "context": "build (linux) / build (linux)" }
         ] } }
   ]
 }
@@ -47,14 +47,10 @@ JSON
 
 List or remove rulesets: `gh api repos/ivanerricis/pentagrit/rulesets`, `gh api -X DELETE repos/ivanerricis/pentagrit/rulesets/<id>`.
 
-`clang-tidy (advisory)` and `asan-ubsan (advisory)` are non-required: they run with `continue-on-error`. Make `asan-ubsan (advisory)` required (and drop `continue-on-error`) once it is clean.
+`clang-tidy (advisory)` and `asan-ubsan (advisory)` are not required: they run with `continue-on-error`. Make `asan-ubsan (advisory)` required (and drop `continue-on-error` in `.github/workflows/ci.yml`) once it is clean.
 
 macOS is only built on `main` or with the `ci:macos` label, so do not make it a required check.
 
-## Private repository limitations
+## Private repositories
 
-On the GitHub Free plan, rulesets and branch protection rules are **not enforced on private repositories** (they need GitHub Pro, Team or Enterprise); the API call may be rejected or the rules saved but inactive. Alternatives:
-
-- Make the repository public (rules are enforced for free; see the AGPL note in `RELEASING.md`).
-- Upgrade to GitHub Pro.
-- Rely on discipline: the squash-only merge settings above (`gh repo edit`) still work on Free, together with the PR template and CODEOWNERS. Never push directly to `main`.
+The repository is public, so rulesets are enforced on the Free plan. If it were ever made private again, rulesets and branch protection rules would need GitHub Pro, Team or Enterprise to be enforced.

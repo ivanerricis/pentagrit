@@ -1,9 +1,9 @@
 # Pentagrit — piano di implementazione
 
-> Stato (2026-10-29): WP0–WP8 uniti su main (scaffold, DSP, engine, preset, UI, CI, docs). In corso: WP9 (impostazioni + barra preset nell editor), WP10 (ottimizzazione CPU). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
+> Stato (2026-11-11): tutti i WP (WP0–WP10) sono uniti su main, più stili visivi, valori digitati, controllo aggiornamenti, compensazione del drive, ADAA su Hard Clip/Wavefold e undo/redo (PR #12–#25). Il lookahead opzionale del transient shaper è l'ultima PR prima della release. Ultima build pubblicata: pre-release `v0.1.0-rc2`; nessuna release stabile. Prossimi passi in fondo ("Stato e prossimi passi"). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
 
 ## Context
-Plugin audio **Pentagrit**: transient shaper + saturatore/distorsore multibanda (JUCE 8, C++20, CMake), open source AGPL-3.0-or-later, repo GitHub privato `ivanerricis/pentagrit`.
+Plugin audio **Pentagrit**: transient shaper + saturatore/distorsore multibanda (JUCE 8, C++20, CMake), open source AGPL-3.0-or-later, repo GitHub `ivanerricis/pentagrit` (privato all'inizio, pubblico dal 2026-10-29).
 Formati: VST3 + CLAP (Windows/macOS/Linux), AU + universal binary (macOS). Dev machine: Windows 11, git/gh ok, CMake 4.5-rc2 e VS Build Tools 2026 (+2022) installati; Ninja/clang-format non installati.
 Piano di dettaglio progettato da un agente Opus; qui la versione operativa. Il lavoro viene poi diviso tra agenti Sonnet 5.5, ognuno in un proprio git worktree.
 
@@ -37,7 +37,8 @@ Flusso: `input → Oversampler.up → inGain → crossover LR4 (cascata SVF TPT)
 - AutoGain: RMS wet vs riferimento dry (400 ms), clamp ±24 dB, smoothing 200 ms, hold in silenzio.
 - Realtime safe: niente allocazioni/lock, `ScopedNoDenormals`, parametri via `std::atomic<float>*`, meter atomici.
 
-## Parametri (63, ID stabili — mai rinominare: CLAP li hasha)
+## Parametri (63 nel piano iniziale, 65 dopo `driveComp` e `lookahead`; ID stabili — mai rinominare: CLAP li hasha)
+Nota (2026-11-11): rispetto all'elenco sotto sono stati aggiunti `osPhase`, `osRender`, `driveComp` e `lookahead`; `oversampling`, `numBands`, `osPhase`, `osRender` e `lookahead` non sono automatabili; `osPhase`, `osRender`, `lookahead` e `bypass` non fanno parte dei preset. I default dei crossover sono 120/1200/3500/8000 Hz. Elenco aggiornato e contratti attuali in `docs/ARCHITECTURE.md`.
 Globali: `inGain`, `outGain`, `mix`, `autoGain`, `oversampling`, `numBands`, `xover1..4` (20–20k log, default 120/500/2000/6000), `bypass`. Per banda `b1_`..`b5_`: `gain`, `attack`, `sustain` (±24 dB), `speed`, `satType`, `drive` (0–36 dB), `mix`, `mute`, `solo`, `bypass`. Stato: APVTS XML `PENTAGRIT_STATE`, `stateVersion=1`, + dimensioni UI. Contratti C++ (ParamIDs/Parameters/DspTypes/Meters e API dei moduli DSP) congelati da WP0 e riportati nell'output dell'agente Opus (da copiare in `docs/ARCHITECTURE.md`).
 
 ## Preset (WP8)
@@ -170,3 +171,16 @@ Pannello Settings (ingranaggio) con 4 schede.
 ## Primi passi dopo l'approvazione
 1. Eseguire WP0 (io o un agente Sonnet), creare il repo privato su GitHub, committare `docs/PLAN.md`, creare issue/milestone dei WP.
 2. Lanciare in parallelo gli agenti Sonnet 5.5 per WP1, WP2, WP3, WP5a, WP6, WP7 (poi WP4, WP8, WP5b).
+
+## Stato e prossimi passi (2026-11-11)
+Fatto: WP0–WP10, installer Windows/macOS, stili visivi, valori digitati e passo dei valori, job clang-tidy e ASan/UBSan (advisory), CI macOS su `macos-15`, parsing del testo dei parametri, validazione di `stateVersion`, latenza riportata dal message thread, controllo aggiornamenti opt-in (Windows/macOS), compensazione del drive, ADAA su Hard Clip e Wavefold, undo/redo, fix del crash all'uscita (cache dei font).
+
+Da fare:
+1. Ascolto dei preset di fabbrica: timbro di Hard Clip / Wavefold con ADAA (leggermente più scuri a 1x/2x) e compensazione del drive.
+2. Test manuale in un host reale (Reaper): testo dei parametri digitato, undo/redo, compensazione della latenza con il lookahead, controllo aggiornamenti dopo la prima release stabile.
+3. Verifica visiva della top bar più stretta e del toggle DRIVE COMP.
+4. Triage di circa 400 warning di clang-tidy (379 riguardano le parentesi graffe).
+5. Rendere obbligatorio il job sanitizer (`asan-ubsan (advisory)`) quando è pulito.
+6. Applicare il ruleset di branch protection su `main` (non ancora attivo, vedi `docs/BRANCH_PROTECTION.md`).
+7. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`).
+8. Release `v0.1.0-rc3`, poi `v0.1.0`. Il controllo aggiornamenti vede solo le release stabili (il "latest" di GitHub ignora le pre-release).
