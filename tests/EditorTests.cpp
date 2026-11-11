@@ -309,3 +309,119 @@ TEST_CASE("Crossover handle typed value and reset", "[gui][Editor]")
     display.resetHandle(0);
     CHECK(raw(processor, pid::xover[0]) == Catch::Approx(120.0f).margin(0.5f));
 }
+
+namespace
+{
+// Prepares the processor with the settings that give the longest latency (8x linear phase, 5 ms lookahead).
+void prepareLongestLatency(PentagritAudioProcessor& processor, double sampleRate)
+{
+    setValue(processor, pid::oversampling, 3.0f);
+    setValue(processor, pid::osPhase, 0.0f);
+    setValue(processor, pid::lookahead, 3.0f);
+    processor.setRateAndBufferSizeDetails(sampleRate, 512);
+    processor.prepareToPlay(sampleRate, 512);
+    processor.getMeters().latencySamples.store(processor.getLatencySamples());
+}
+} // namespace
+
+TEST_CASE("Latency readout fits its area with a clear gap", "[gui][Editor]")
+{
+    for (double sampleRate : {44100.0, 192000.0})
+    {
+        for (int si = 0; si < ui::kNumStyles; ++si)
+        {
+            PentagritAudioProcessor processor;
+            prepareLongestLatency(processor, sampleRate);
+            REQUIRE(processor.getLatencySamples() > 100);
+            PentagritAudioProcessorEditor editor(processor);
+
+            for (int bands = 2; bands <= 5; ++bands)
+            {
+                for (auto layout : {ui::Layout::full, ui::Layout::compact})
+                {
+                    for (int zoom : {75, 100})
+                    {
+                        setValue(processor, pid::numBands, static_cast<float>(bands));
+                        ui::UiOptions o;
+                        o.style = static_cast<ui::Style>(si);
+                        o.layout = layout;
+                        o.zoomPercent = zoom;
+                        editor.setUiOptions(o);
+                        editor.refreshNow();
+
+                        auto& top = editor.getTopBar();
+                        INFO(sampleRate << " Hz, style " << si << ", " << bands << " bands, zoom " << zoom
+                                        << ", text '" << top.latencyText() << "'");
+                        CHECK(top.latencyText().contains("ms"));
+                        CHECK(top.latencyText().contains(juce::String(processor.getLatencySamples())));
+
+                        const auto area = top.latencyArea();
+                        CHECK(area.getWidth() > 0);
+                        CHECK(top.latencyTextWidth() <=
+                              static_cast<float>(area.getWidth() - 2 * ui::TopBar::kLatencyPad));
+                        // No neighbour overlaps the area (OS selector, AUTO-GAIN, preset slot, ...).
+                        for (auto* child : top.getChildren())
+                        {
+                            if (child->isVisible())
+                            {
+                                CHECK_FALSE(child->getBounds().intersects(area));
+                            }
+                        }
+                        CHECK(top.getLocalBounds().contains(area));
+                        if (si == 0 && bands == 5 && zoom == 100)
+                        {
+                            snapshot(editor, "latency_longest_" + juce::String(static_cast<int>(sampleRate)) +
+                                                 (layout == ui::Layout::full ? "_full" : "_compact"));
+                        }
+                        CHECK(top.presetSlot().getWidth() >= 300);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("Transient knob captions keep a gap at 2 to 5 bands in every style", "[gui][Editor]")
+{
+    PentagritAudioProcessor processor;
+    PentagritAudioProcessorEditor editor(processor);
+    for (int bands : {2, 3, 4, 5})
+    {
+        for (int si = 0; si < ui::kNumStyles; ++si)
+        {
+            for (auto layout : {ui::Layout::full, ui::Layout::compact})
+            {
+                setValue(processor, pid::numBands, static_cast<float>(bands));
+                ui::UiOptions o;
+                o.style = static_cast<ui::Style>(si);
+                o.layout = layout;
+                editor.setUiOptions(o);
+                editor.refreshNow();
+
+                for (int b = 0; b < bands; ++b)
+                {
+                    const auto knobs = editor.getStrip(b).transientKnobs();
+                    for (size_t i = 0; i < knobs.size(); ++i)
+                    {
+                        INFO("style " << si << ", " << bands << " bands, band " << b << ", "
+                                      << knobs[i]->caption());
+                        const float w = knobs[i]->captionWidth();
+                        // The caption fits its own cell with a margin ...
+                        CHECK(w <= static_cast<float>(knobs[i]->getWidth() - ui::LabelledKnob::kCaptionGap));
+                        // ... so the clear space between two captions is at least the gap.
+                        if (i > 0)
+                        {
+                            const auto* prev = knobs[i - 1];
+                            const float prevRight = static_cast<float>(prev->getBounds().getCentreX()) +
+                                                    prev->captionWidth() * 0.5f;
+                            const float left =
+                                static_cast<float>(knobs[i]->getBounds().getCentreX()) - w * 0.5f;
+                            CHECK(left - prevRight >=
+                                  static_cast<float>(ui::LabelledKnob::kCaptionGap) - 1.0f);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

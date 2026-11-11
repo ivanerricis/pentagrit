@@ -48,6 +48,12 @@ public:
     void tick();
 
     juce::String latencyText() const { return latencyText_; }
+    // Area of the latency readout, the font its text is drawn with and the width of the text. The text keeps
+    // kLatencyPad px free on each side of the area.
+    static constexpr int kLatencyW = 112, kLatencyPad = 5;
+    juce::Rectangle<int> latencyArea() const noexcept { return latencyArea_; }
+    juce::Font latencyFont() const;
+    float latencyTextWidth() const;
 
     void resized() override;
     void paint(juce::Graphics&) override;

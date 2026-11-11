@@ -24,6 +24,11 @@ public:
     int bandIndex() const noexcept { return index_; }
     bool isMuted() const noexcept;
     bool isSolo() const noexcept;
+    // The Attack / Sustain / Speed knobs, left to right (their captions are checked by the tests).
+    std::array<const LabelledKnob*, 3> transientKnobs() const noexcept
+    {
+        return {&attack_, &sustain_, &speed_};
+    }
 
     void resized() override;
     void paint(juce::Graphics&) override;
