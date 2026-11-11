@@ -3,6 +3,7 @@
 
 #include "PluginInfo.h"
 #include "ui/Fonts.h"
+#include "update/UpdateChecker.h"
 
 namespace pentagrit::ui
 {
@@ -461,6 +462,7 @@ SettingsPanel::SettingsPanel(PentagritAudioProcessor& processor)
     addAndMakeVisible(viewport_);
 
     settings_.addChangeListener(this);
+    settings_.updateChanges().addChangeListener(this);
     startTimer(500);
     rebuildPage();
 }
@@ -468,6 +470,7 @@ SettingsPanel::SettingsPanel(PentagritAudioProcessor& processor)
 SettingsPanel::~SettingsPanel()
 {
     stopTimer();
+    settings_.updateChanges().removeChangeListener(this);
     settings_.removeChangeListener(this);
 }
 
@@ -496,8 +499,17 @@ void SettingsPanel::apply(const std::function<void(UserSettings&)>& edit)
     --guard_;
 }
 
-void SettingsPanel::changeListenerCallback(juce::ChangeBroadcaster*)
+void SettingsPanel::changeListenerCallback(juce::ChangeBroadcaster* source)
 {
+    if (source == &settings_.updateChanges())
+    {
+        if (tab_ == tabAbout)
+        {
+            rebuildPage();
+            say({});
+        }
+        return;
+    }
     if (guard_ == 0)
         rebuildPage(); // changed from elsewhere (reset, another instance, file edit)
 }
@@ -1003,22 +1015,71 @@ void SettingsPanel::buildAbout(Page& page)
     }
 
     page.add(heading("Updates"), 28);
+    if (SettingsManager::kUpdateCheckAvailable)
     {
-        auto desc = juce::String("Off by default.");
-        if (!SettingsManager::kUpdateCheckAvailable)
-            desc << " Not available yet: the repository is private.";
-        textRow("Check for updates on startup", desc,
-                std::make_unique<Switch>(s.checkUpdates, [this](bool on)
-                                         { apply([on](UserSettings& u) { u.checkUpdates = on; }); }),
-                38);
+        auto toggle = std::make_unique<Switch>(s.checkUpdates,
+                                               [this](bool on)
+                                               {
+                                                   apply([on](UserSettings& u) { u.checkUpdates = on; });
+                                                   if (on)
+                                                       settings_.checkForUpdatesIfDue();
+                                               });
+        textRow("Check for updates once a day",
+                "Off by default. When on, Pentagrit asks GitHub for the latest release when the editor "
+                "opens, at most once a day.",
+                std::move(toggle), 38, 64);
         auto button = std::make_unique<juce::TextButton>("Check now");
         button->onClick = [this]
         {
-            say(SettingsManager::kUpdateCheckAvailable
-                    ? "Checking..."
-                    : "Update check is unavailable while the repository is private. No request was made.");
+            if (settings_.checkForUpdatesNow())
+                say("Checking...");
         };
-        textRow("Check now", "Contacts GitHub; no personal data sent.", std::move(button), 110);
+        textRow("Check now",
+                "Sends one request to api.github.com with the name \"Pentagrit\" as user agent. No "
+                "identifiers, no version, nothing else.",
+                std::move(button), 110, 64);
+
+        const auto& us = settings_.getUpdateState();
+        using Phase = SettingsManager::UpdateState::Phase;
+        using Status = update::UpdateResult::Status;
+        if (us.phase == Phase::checking)
+        {
+            textRow("Checking for updates...", {}, nullptr, 0, 44);
+        }
+        else if (us.phase == Phase::done)
+        {
+            const auto& r = us.result;
+            if (r.status == Status::updateAvailable)
+            {
+                auto link =
+                    std::make_unique<Styled<juce::HyperlinkButton>>("Open release page", juce::URL(r.url));
+                link->style = [](juce::HyperlinkButton& l, const Palette& p)
+                {
+                    l.setColour(juce::HyperlinkButton::textColourId, p.band[4]);
+                    l.setFont(fonts::sans(12.0f, fonts::Weight::medium), false,
+                              juce::Justification::centredRight);
+                };
+                textRow("Version " + r.version + " is available",
+                        "You are running v" + juce::String(info::kVersion) + ".", std::move(link), 150, 56);
+            }
+            else if (r.status == Status::upToDate)
+            {
+                textRow("Pentagrit is up to date", "Latest release: v" + r.version + ".", nullptr, 0, 56);
+            }
+            else
+            {
+                textRow("The update check failed", r.reason, nullptr, 0, 56);
+            }
+        }
+    }
+    else
+    {
+        auto button = std::make_unique<juce::TextButton>("Check now");
+        button->onClick = [] { juce::URL(update::kReleasesPageUrl).launchInDefaultBrowser(); };
+        textRow("Check now",
+                "Automatic update checks are not available on Linux. This opens the releases page in your "
+                "browser; nothing is sent.",
+                std::move(button), 110, 64);
     }
 
     page.add(heading("Reset"), 28);
