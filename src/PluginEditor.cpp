@@ -96,6 +96,8 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     lastTickMs_ = juce::Time::getMillisecondCounterHiRes();
     refreshNow();
     processor_.getSettings().addChangeListener(this);
+    // Opt-in, at most once a day; never blocks (the request runs on a background thread).
+    processor_.getSettings().checkForUpdatesIfDue();
 }
 
 PentagritAudioProcessorEditor::~PentagritAudioProcessorEditor()
