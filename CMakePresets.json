@@ -46,7 +46,21 @@
     },
     { "name": "ci-windows", "inherits": "win-ninja", "displayName": "CI - Windows" },
     { "name": "ci-macos", "inherits": "mac-universal", "displayName": "CI - macOS" },
-    { "name": "ci-linux", "inherits": "linux", "displayName": "CI - Linux" }
+    { "name": "ci-linux", "inherits": "linux", "displayName": "CI - Linux" },
+    {
+      "name": "ci-linux-asan",
+      "inherits": "linux",
+      "displayName": "CI - Linux, Debug + ASan/UBSan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PENTAGRIT_BUILD_TESTS": "ON",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    }
   ],
   "buildPresets": [
     { "name": "win-vs-release", "configurePreset": "win-vs", "configuration": "Release" },
@@ -56,7 +70,8 @@
     { "name": "linux", "configurePreset": "linux" },
     { "name": "ci-windows", "configurePreset": "ci-windows" },
     { "name": "ci-macos", "configurePreset": "ci-macos" },
-    { "name": "ci-linux", "configurePreset": "ci-linux" }
+    { "name": "ci-linux", "configurePreset": "ci-linux" },
+    { "name": "ci-linux-asan", "configurePreset": "ci-linux-asan", "targets": ["PentagritTests"] }
   ],
   "testPresets": [
     {
@@ -70,6 +85,7 @@
     { "name": "linux", "configurePreset": "linux", "output": { "outputOnFailure": true } },
     { "name": "ci-windows", "configurePreset": "ci-windows", "output": { "outputOnFailure": true } },
     { "name": "ci-macos", "configurePreset": "ci-macos", "output": { "outputOnFailure": true } },
-    { "name": "ci-linux", "configurePreset": "ci-linux", "output": { "outputOnFailure": true } }
+    { "name": "ci-linux", "configurePreset": "ci-linux", "output": { "outputOnFailure": true } },
+    { "name": "ci-linux-asan", "configurePreset": "ci-linux-asan", "output": { "outputOnFailure": true } }
   ]
 }

@@ -35,7 +35,8 @@ gh api -X POST repos/ivanerricis/pentagrit/rulesets --input - <<'JSON'
     { "type": "required_status_checks", "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "lint" },
+          { "context": "clang-format 18" },
+          { "context": "PR title (conventional commit)" },
           { "context": "build / windows" },
           { "context": "build / linux" }
         ] } }
@@ -45,6 +46,8 @@ JSON
 ```
 
 List or remove rulesets: `gh api repos/ivanerricis/pentagrit/rulesets`, `gh api -X DELETE repos/ivanerricis/pentagrit/rulesets/<id>`.
+
+`clang-tidy (advisory)` and `asan-ubsan (advisory)` are non-required: they run with `continue-on-error`. Make `asan-ubsan (advisory)` required (and drop `continue-on-error`) once it is clean.
 
 macOS is only built on `main` or with the `ci:macos` label, so do not make it a required check.
 
