@@ -2,6 +2,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "ui/BandLink.h"
 #include "ui/BandStrip.h"
 #include "ui/CrossoverDisplay.h"
 #include "ui/Footer.h"
@@ -59,6 +60,7 @@ public:
     bool isCompact() const noexcept { return options_.layout == ui::Layout::compact; }
     ui::BandStrip& getStrip(int band) noexcept { return *strips_[static_cast<size_t>(band)]; }
     ui::CrossoverDisplay& getCrossover() noexcept { return crossover_; }
+    ui::BandLink& getBandLink() noexcept { return *bandLink_; }
     // Runs one UI refresh synchronously (what the timer does).
     void refreshNow();
 
@@ -111,6 +113,7 @@ private:
     juce::ComponentBoundsConstrainer constrainer_;
     std::unique_ptr<PresetBar> presetBar_;
     std::unique_ptr<ui::SettingsPanel> settingsPanel_;
+    std::unique_ptr<ui::BandLink> bandLink_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PentagritAudioProcessorEditor)
 };

@@ -263,7 +263,7 @@ void PentagritLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButto
     {
         bg = bg.withAlpha(0.5f);
     }
-    const bool small = kind == "mute" || kind == "solo" || kind == "bypass";
+    const bool small = kind == "mute" || kind == "solo" || kind == "bypass" || kind == "link";
     const float radius = small ? pal_->rSmall : pal_->rButton;
     const auto onColour = onBand ? pal_->onBand : pal_->onAct;
     g.setColour(bg);
@@ -277,6 +277,14 @@ void PentagritLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButto
     if (kind == "gear")
     {
         drawGear(g, area.withSizeKeepingCentre(16.0f, 16.0f), on ? onColour : (hl ? pal_->ink : pal_->ink2));
+    }
+    else if (kind == "link")
+    {
+        // Two interlocked chain links.
+        g.setColour(en ? (on ? onColour : (hl ? pal_->ink : pal_->ink2)) : pal_->ink3);
+        const auto c = area.getCentre();
+        g.drawRoundedRectangle(c.x - 7.0f, c.y - 3.5f, 9.0f, 7.0f, 3.5f, 1.4f);
+        g.drawRoundedRectangle(c.x - 2.0f, c.y - 3.5f, 9.0f, 7.0f, 3.5f, 1.4f);
     }
     else
     {

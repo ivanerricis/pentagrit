@@ -22,6 +22,17 @@ public:
     void tick(float dtSec);
 
     int bandIndex() const noexcept { return index_; }
+    // Link toggle in the header (see BandLink): the editor stores the state, the strip only shows it.
+    std::function<void(bool)> onLinkToggled;
+    void setLinked(bool linked);
+    bool isLinked() const noexcept { return link_.getToggleState(); }
+    // Header buttons, left to right: link, M, S, B (tests check that they do not overlap each other or the
+    // "B1" label, which ends at kHeaderLabelRight).
+    std::array<juce::Rectangle<int>, 4> headerButtonBounds() const noexcept
+    {
+        return {link_.getBounds(), mute_.getBounds(), solo_.getBounds(), bypass_.getBounds()};
+    }
+    static constexpr int kHeaderLabelRight = 36;
     bool isMuted() const noexcept;
     bool isSolo() const noexcept;
     // The Attack / Sustain / Speed knobs, left to right (their captions are checked by the tests).
@@ -55,7 +66,7 @@ private:
     bool compact_ = false;
     bool dimmed_ = false;
 
-    juce::ToggleButton mute_{"M"}, solo_{"S"}, bypass_{"B"};
+    juce::ToggleButton link_, mute_{"M"}, solo_{"S"}, bypass_{"B"};
     std::unique_ptr<juce::ButtonParameterAttachment> muteAtt_, soloAtt_, bypassAtt_;
     juce::Label from_, to_;
     juce::Label fromCaption_, toCaption_;
