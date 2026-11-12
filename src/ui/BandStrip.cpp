@@ -94,7 +94,10 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
 
     addAndMakeVisible(inner_);
     inner_.setInterceptsMouseClicks(false, true);
-    transient_.setTooltip("Live transient gain applied to this band");
+    transient_.setTooltip("Gain change of the transient shaper in this band, +-24 dB. The bar shows the "
+                          "largest boost (right) and cut (left) of the last audio block; the markers hold "
+                          "the extremes and the readout shows the held one.");
+    transient_.setTitle(bn + " gain change");
     meter_.setTooltip("Band output peak");
     meter_.setTitle(bn + " output level");
     for (auto* c : std::initializer_list<juce::Component*>{&transient_, &attack_, &sustain_, &speed_, &sat_,
@@ -159,6 +162,7 @@ void BandStrip::applyOptions(const UiOptions& o)
         k->applyOptions(o);
     }
     meter_.setBallistics(o.meterHoldSec, o.meterReleaseDbPerSec);
+    transient_.setBallistics(o.meterHoldSec, o.meterReleaseDbPerSec);
     compact_ = o.layout == Layout::compact;
     for (auto* l : {&from_, &to_, &fromCaption_, &toCaption_})
     {
@@ -240,8 +244,9 @@ void BandStrip::tick(float dt)
 {
     const float peak = meters_.bandPeakDb[static_cast<size_t>(index_)].load(std::memory_order_relaxed);
     meter_.update(peak, dt);
-    transient_.setGainDb(
-        meters_.bandTransientGainDb[static_cast<size_t>(index_)].load(std::memory_order_relaxed));
+    transient_.update(
+        meters_.bandTransientGainMinDb[static_cast<size_t>(index_)].load(std::memory_order_relaxed),
+        meters_.bandTransientGainMaxDb[static_cast<size_t>(index_)].load(std::memory_order_relaxed), dt);
     const float d = driveRaw_->load(std::memory_order_relaxed);
     if (d != lastDrive_)
     {

@@ -92,7 +92,8 @@ struct EngineSettings { float inGainDb=0, outGainDb=0, mix01=1; bool autoGain=fa
   int numBands=3; std::array<float,4> xoverHz{120,1200,3500,8000};
   std::array<BandSettings,kMaxBands> bands{}; /* + lookahead, see the header */ };
 // dsp/Meters.h  (audio thread writes relaxed, UI reads)
-struct MeterState { std::array<std::atomic<float>,kMaxBands> bandPeakDb, bandTransientGainDb;
+struct MeterState { std::array<std::atomic<float>,kMaxBands> bandPeakDb, bandTransientGainDb,
+  bandTransientGainMinDb, bandTransientGainMaxDb; /* dB range of the transient gain over the last host block, 0/0 when idle */
   std::atomic<float> inPeakDb{-100}, outPeakDb{-100}, autoGainDb{0};
   std::array<std::atomic<float>,4> effectiveXoverHz; std::atomic<int> latencySamples{0};
   std::atomic<float> cpuLoad{0.f}; /* fraction 0..1 of block time in processBlock */ };
@@ -103,10 +104,10 @@ DSP module conventions: `prepare()` may allocate (only from `prepareToPlay`); `s
 Module APIs (see the headers in `src/dsp/` for exact signatures):
 
 - `Crossover`: `prepare(baseRate, procRate, maxBlock, numCh)`, `setNumBands`, `setFrequencies(array<float,4>)`, `getEffectiveFrequencies`, `static enforceOrdering(hz, numBands, baseRate)`, `split(in, array<AudioBlock<float>,5>&)`, `processAllpassChain(io)`.
-- `TransientShaper`: `setParameters(attackDb, sustainDb, speed01)`, `setLowFrequencyHint(hz)`, `process(block)`, `getLastGainDb()`.
+- `TransientShaper`: `setParameters(attackDb, sustainDb, speed01)`, `setLowFrequencyHint(hz)`, `process(block)`, `getLastGainDb()`, `consumeGainRange()` (min/max of the smoothed gain at the control ticks since the previous call; returns and restarts it).
 - `Saturator`: `setType`, `setDriveDb`, `process`, `static shape(SatType, float u)` (also used by the UI preview); drive compensation and ADAA state are internal.
 - `AutoGain`: `setEnabled`, `process(ref, wet)`, `getCurrentGainDb()`.
-- `BandProcessor`: `setSettings(BandSettings, audible, lowFreqHintHz)`, `process`, `getTransientGainDb()`.
+- `BandProcessor`: `setSettings(BandSettings, audible, lowFreqHintHz)`, `process`, `getTransientGainDb()`, `consumeTransientGainRange()` (0/0 while the band is cold).
 - `MultibandEngine`: `prepare(sr, maxBlock, numCh)`, `setSettings(EngineSettings)`, `process(AudioBuffer<float>&)` (internal chunking), `getLatencySamples()`, `static effectiveFactor(OSFactor, sr)`, `static computeAudibility(settings)`, `meters()`.
 - `PentagritAudioProcessor`: `getAPVTS()`, `getMeters()`, `getPresetManager()`, `getSettings()`, `getUndoManager()`; UI size persisted via `getUiSize()` / `setUiSize()`.
 

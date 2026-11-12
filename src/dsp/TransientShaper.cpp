@@ -41,6 +41,7 @@ void TransientShaper::reset() noexcept
     e1_ = e2_ = e3_ = e4_ = 0.0f;
     gSmooth_ = 0.0f;
     lastGainDb_ = 0.0f;
+    rangeMinDb_ = rangeMaxDb_ = 0.0f;
     lin_ = linTarget_ = 1.0f;
     linStep_ = 0.0f;
     ctrlLeft_ = 0;
@@ -114,6 +115,7 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
 
     float e1 = e1_, e2 = e2_, e3 = e3_, e4 = e4_, g = gSmooth_;
     float lin = lin_, linStep = linStep_;
+    float gMin = rangeMinDb_, gMax = rangeMaxDb_;
     int left = ctrlLeft_;
     const float aF = aFast_, aS = aE2_, r1 = rE1_, r3 = rE3_, r4 = rE4_;
     const float atk = attackDb_, sus = sustainDb_;
@@ -144,6 +146,8 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
             }
             g = aGainCtrl_ * g + (1.0f - aGainCtrl_) * gT;
             g = std::abs(g) < 1.0e-9f ? 0.0f : g;
+            gMin = std::min(gMin, g);
+            gMax = std::max(gMax, g);
             linTarget_ = dbToGain(g);
             left = ctrlInterval_;
             linStep = (linTarget_ - lin) / static_cast<float>(left);
@@ -203,6 +207,8 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
     e4_ = e4;
     gSmooth_ = g;
     lastGainDb_ = g;
+    rangeMinDb_ = gMin;
+    rangeMaxDb_ = gMax;
     lin_ = lin;
     linStep_ = linStep;
     ctrlLeft_ = left;
@@ -211,5 +217,12 @@ void TransientShaper::process(const juce::dsp::AudioBlock<const float>& detector
 float TransientShaper::getLastGainDb() const noexcept
 {
     return lastGainDb_;
+}
+
+GainRangeDb TransientShaper::consumeGainRange() noexcept
+{
+    const GainRangeDb r{rangeMinDb_, rangeMaxDb_};
+    rangeMinDb_ = rangeMaxDb_ = gSmooth_;
+    return r;
 }
 } // namespace pentagrit

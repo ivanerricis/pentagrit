@@ -5,6 +5,12 @@
 
 namespace pentagrit
 {
+// Smallest and largest smoothed gain (dB) seen at the control ticks since the previous consumeGainRange().
+struct GainRangeDb
+{
+    float minDb = 0.0f, maxDb = 0.0f;
+};
+
 // Differential-envelope transient shaper (stereo-linked, zero latency by itself). Lookahead is done by the
 // caller: process(detector, audio) measures `detector` and applies the gain to `audio`, which can be a
 // delayed copy of it.
@@ -22,12 +28,15 @@ public:
     void process(const juce::dsp::AudioBlock<const float>& detector,
                  const juce::dsp::AudioBlock<float>& audio) noexcept;
     float getLastGainDb() const noexcept;
+    // Returns the gain range since the last call and restarts it from the current gain (no per-sample work).
+    GainRangeDb consumeGainRange() noexcept;
 
 private:
     void updateCoeffs() noexcept;
 
     double rate_ = 44100.0;
     float attackDb_ = 0, sustainDb_ = 0, speed01_ = 0.5f, lowHintHz_ = 0, lastGainDb_ = 0;
+    float rangeMinDb_ = 0, rangeMaxDb_ = 0;
 
     // coefficients
     float aFast_ = 0, rE1_ = 0, aE2_ = 0, rE3_ = 0, rE4_ = 0, aGain_ = 0;
