@@ -17,6 +17,7 @@ public:
     void applyOptions(const UiOptions& o);
     // `numBands` = active bands; the From/To fields use it to know which edges are editable.
     void setNumBands(int numBands);
+    int numBands() const noexcept { return numBands_; }
     void setDimmed(bool dim);
     // Called from the editor timer. Returns nothing; reads MeterState and (compact) the crossover values.
     void tick(float dtSec);

@@ -187,6 +187,7 @@ void LabelledKnob::beginTyping()
     }
     editor_ = std::make_unique<juce::TextEditor>();
     editor_->setTitle(label_);
+    editor_->setTooltip("Type a value, e.g. -3 or 50 %. Enter confirms, Esc cancels.");
     editor_->setJustification(juce::Justification::centred);
     editor_->setFont(fonts::mono(10.5f, fonts::Weight::regular));
     editor_->setIndents(0, 0);
@@ -448,8 +449,8 @@ SatTypeSelector::SatTypeSelector(juce::AudioProcessorValueTreeState& apvts, cons
     name_.setTitle(title);
     for (auto* b : {&prev_, &name_, &next_})
     {
-        b->setTooltip(b == &name_ ? "Saturation curve (click to step)"
-                                  : (b == &prev_ ? "Previous curve" : "Next curve"));
+        b->setTooltip(b == &name_ ? "Saturation curve: click to step to the next one, or use the arrows."
+                                  : (b == &prev_ ? "Previous saturation curve." : "Next saturation curve."));
         addAndMakeVisible(*b);
     }
     prev_.onClick = [this] { step(-1); };

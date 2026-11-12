@@ -15,6 +15,7 @@ public:
 
     void applyTheme() { repaint(); }
     void setNumBands(int n);
+    int numBands() const noexcept { return numBands_; }
     void tick(); // repaints when the meters changed
 
     // Geometry helpers (public for tests).

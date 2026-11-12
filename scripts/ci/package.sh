@@ -67,6 +67,7 @@ if [[ "$platform" == macos-* ]]; then
 fi
 
 cp "$root/LICENSE" "$stage/LICENSE"
+cp "$root/docs/GUIDE.md" "$stage/GUIDE.md"
 
 case "$platform" in
 windows-*)
@@ -97,7 +98,7 @@ Installation
 ------------
 ${install_text}
 
-Rescan plugins in your host after copying.
+Rescan plugins in your host after copying. GUIDE.md is the user guide.
 TXT
 
 (cd "$out_dir/stage" && cmake -E tar cf "$out_dir/$name.zip" --format=zip -- "$name")

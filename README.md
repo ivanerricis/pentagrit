@@ -20,6 +20,8 @@ Status: first stable release, `v0.1.0`. The repository is public. License: AGPL-
 
 Formats: VST3 and CLAP on Windows, macOS and Linux; AU on macOS; plus a Standalone app.
 
+New to Pentagrit? Read the [user guide](docs/GUIDE.md).
+
 ## Install
 
 Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.1.0`; release candidates are listed there as pre-releases.

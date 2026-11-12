@@ -82,6 +82,13 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
 
     numBands_ =
         juce::jlimit(2, kMaxBands, juce::roundToInt(apvts.getRawParameterValue(pid::numBands)->load()));
+    // The crossover display and the strips start at 3 bands: tell them the current count (no handle is moved
+    // and nothing is recorded for undo, unlike a raise made through applyNumBands).
+    crossover_.setNumBands(numBands_);
+    for (auto& s : strips_)
+    {
+        s->setNumBands(numBands_);
+    }
     numBandsAttachment_ = std::make_unique<juce::ParameterAttachment>(
         *apvts.getParameter(pid::numBands), [this](float v) { applyNumBands(juce::roundToInt(v), true); },
         nullptr);

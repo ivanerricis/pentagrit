@@ -587,3 +587,116 @@ TEST_CASE("MONITOR row fits the master panel and its switches work", "[gui][Edit
     }
     processor.getSettings().set(original);
 }
+
+namespace
+{
+bool isVisibleInTree(const juce::Component& c, const juce::Component& root)
+{
+    // The root itself is not checked: an editor that is not on screen is not visible.
+    for (auto* p = &c; p != nullptr && p != &root; p = p->getParentComponent())
+    {
+        if (!p->isVisible())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool isInteractive(juce::Component& c)
+{
+    if (dynamic_cast<juce::Viewport*>(&c) != nullptr || dynamic_cast<juce::ScrollBar*>(&c) != nullptr ||
+        dynamic_cast<juce::AudioProcessorEditor*>(&c) != nullptr ||
+        dynamic_cast<ui::SettingsPanel*>(&c) != nullptr)
+    {
+        return false;
+    }
+    if (dynamic_cast<juce::Button*>(&c) != nullptr || dynamic_cast<juce::Slider*>(&c) != nullptr ||
+        dynamic_cast<juce::ComboBox*>(&c) != nullptr || dynamic_cast<juce::TextEditor*>(&c) != nullptr)
+    {
+        return true;
+    }
+    if (auto* label = dynamic_cast<juce::Label*>(&c))
+    {
+        return label->isEditable();
+    }
+    return c.getWantsKeyboardFocus();
+}
+
+void collectTooltipGaps(juce::Component& c, const juce::Component& root, juce::StringArray& gaps,
+                        int& interactiveCount)
+{
+    if (isVisibleInTree(c, root) && isInteractive(c))
+    {
+        ++interactiveCount;
+        auto* tc = dynamic_cast<juce::SettableTooltipClient*>(&c);
+        if (tc == nullptr || tc->getTooltip().isEmpty())
+        {
+            gaps.add(juce::String(typeid(c).name()) + " \"" + c.getTitle() + "\"" +
+                     (tc == nullptr ? " (no tooltip client)" : " (empty tooltip)"));
+        }
+    }
+    for (auto* child : c.getChildren())
+    {
+        collectTooltipGaps(*child, root, gaps, interactiveCount);
+    }
+}
+} // namespace
+
+TEST_CASE("Every visible interactive control has a tooltip", "[gui][Editor][tooltips]")
+{
+    PentagritAudioProcessor processor;
+    PentagritAudioProcessorEditor editor(processor);
+    for (auto layout : {ui::Layout::full, ui::Layout::compact})
+        for (int bands : {3, 5})
+        {
+            setValue(processor, pid::numBands, static_cast<float>(bands));
+            ui::UiOptions o;
+            o.layout = layout;
+            editor.setUiOptions(o);
+            editor.refreshNow();
+            INFO("layout " << (layout == ui::Layout::full ? "full" : "compact") << ", bands " << bands);
+            juce::StringArray gaps;
+            int count = 0;
+            collectTooltipGaps(editor, editor, gaps, count);
+            INFO(gaps.joinIntoString("\n"));
+            CHECK(count > 30);
+            CHECK(gaps.isEmpty());
+        }
+}
+
+TEST_CASE("Every control of the settings tabs has a tooltip", "[gui][Editor][tooltips]")
+{
+    PentagritAudioProcessor processor;
+    PentagritAudioProcessorEditor editor(processor);
+    editor.openSettings();
+    auto* panel = editor.getSettingsPanel();
+    REQUIRE(panel != nullptr);
+    for (int tab = 0; tab < ui::SettingsPanel::numTabs; ++tab)
+    {
+        panel->showTab(tab);
+        INFO("tab " << tab);
+        juce::StringArray gaps;
+        int count = 0;
+        collectTooltipGaps(*panel, *panel, gaps, count);
+        INFO(gaps.joinIntoString("\n"));
+        CHECK(count >= 3);
+        CHECK(gaps.isEmpty());
+    }
+    editor.closeSettings();
+}
+
+TEST_CASE("Editor opened with 5 bands shows 5 bands", "[gui][Editor]")
+{
+    PentagritAudioProcessor processor;
+    setValue(processor, pid::numBands, 5.0f);
+    const float x4 = raw(processor, pid::xover[3]);
+    PentagritAudioProcessorEditor editor(processor);
+    CHECK(editor.numBands() == 5);
+    CHECK(editor.getCrossover().numBands() == 5);
+    CHECK(visibleStrips(editor) == 5);
+    for (int b = 0; b < kMaxBands; ++b)
+        CHECK(editor.getStrip(b).numBands() == 5);
+    CHECK(raw(processor, pid::xover[3]) == x4);
+    CHECK_FALSE(processor.getUndoManager().canUndo());
+}

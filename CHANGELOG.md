@@ -14,12 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Delta monitoring: a "Delta" switch in the new MONITOR row of the master panel plays only what the plugin changes (the processed signal minus the phase-matched dry), with a "DELTA" tint on the output meter. It is a session switch (not saved in projects or presets, off when the plugin loads) and bypass wins.
 - Level-matched bypass: the "Match bypass" switch scales the bypassed signal to the loudness the plugin output had, so A/B compares tone and not volume. It is a per-user option (off by default), works in live playback only (offline renders keep the exact bypass) and shows the applied gain next to the switch.
+- A short user guide (`docs/GUIDE.md`), linked from the README and the About tab of the settings and included in the release zips, and a complete tooltip pass: every control of the editor and of the settings panel now has a tooltip.
+
 ### Changed
 
 - CI runs clap-validator on Windows, Linux and macOS and a failure now fails the build (it was advisory). The download script extracts the nested Linux and macOS archives and verifies a pinned SHA-256, and the validator output is uploaded with the validation logs.
 
 ### Fixed
 
+- The crossover display and the band strips stayed at 3 bands when the editor was opened on a session that already had 4 or 5 bands.
 - CLAP: loading a saved state now asks the host to re-read all parameter values, so hosts that cache them (and clap-validator's state-reproducibility tests) see the restored values.
 
 ## [0.1.0] - 2026-11-12

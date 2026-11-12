@@ -15,6 +15,28 @@ constexpr int kMessageH = 30;
 constexpr int kRowH = 56;
 constexpr int kRowGap = 6;
 constexpr const char* kRepoUrl = "https://github.com/ivanerricis/pentagrit";
+constexpr const char* kGuideUrl = "https://github.com/ivanerricis/pentagrit/blob/main/docs/GUIDE.md";
+
+// Gives every tooltip client of `c` and of its children that has no tooltip yet the text `tip`, so that the
+// tooltip window (which only looks at the component under the mouse) always finds one.
+void applyTooltip(juce::Component& c, const juce::String& tip)
+{
+    if (tip.isEmpty())
+    {
+        return;
+    }
+    if (auto* tc = dynamic_cast<juce::SettableTooltipClient*>(&c))
+    {
+        if (tc->getTooltip().isEmpty())
+        {
+            tc->setTooltip(tip);
+        }
+    }
+    for (auto* child : c.getChildren())
+    {
+        applyTooltip(*child, tip);
+    }
+}
 
 float textWidth(const juce::Font& f, const juce::String& text)
 {
@@ -171,6 +193,9 @@ public:
         edit.setFont(fonts::mono(10.5f));
         edit.setTextToShowWhenEmpty("(default)", juce::Colours::grey);
         edit.setTitle("User preset folder");
+        edit.setTooltip("Folder with your user presets: type a path and press Enter. Default if empty.");
+        choose.setTooltip("Choose the user preset folder.");
+        open.setTooltip("Open the user preset folder in your file manager.");
         addAndMakeVisible(edit);
         addAndMakeVisible(choose);
         addAndMakeVisible(open);
@@ -208,7 +233,7 @@ public:
 
 // ================================================================================================ widgets
 
-class SettingsPanel::Segmented final : public juce::Component
+class SettingsPanel::Segmented final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     Segmented(juce::StringArray labels, int selected, std::function<void(int)> onChange)
@@ -294,7 +319,7 @@ private:
     std::function<void(int)> onChange_;
 };
 
-class SettingsPanel::Switch final : public juce::Component
+class SettingsPanel::Switch final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     Switch(bool on, std::function<void(bool)> onChange) : on_(on), onChange_(std::move(onChange))
@@ -344,14 +369,17 @@ private:
 };
 
 // Row: label + description on the left, control on the right (optionally an extra component below).
-class SettingsPanel::Row final : public juce::Component
+class SettingsPanel::Row final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    Row(juce::String title, juce::String desc, bool badge)
+    // The tooltip of the row and of every control in it is `tip`, or the description when there is none.
+    Row(juce::String title, juce::String desc, bool badge, juce::String tip = {})
         : title_(std::move(title)), desc_(std::move(desc)), badge_(badge)
     {
         setTitle(title_);
         setDescription(desc_);
+        tip_ = tip.isNotEmpty() ? std::move(tip) : desc_;
+        setTooltip(tip_);
     }
     void setControl(std::unique_ptr<juce::Component> c, int w, int h)
     {
@@ -359,12 +387,14 @@ public:
         controlW_ = w;
         controlH_ = h;
         addAndMakeVisible(*control_);
+        applyTooltip(*control_, tip_);
     }
     void setExtra(std::unique_ptr<juce::Component> c, int h)
     {
         extra_ = std::move(c);
         extraH_ = h;
         addAndMakeVisible(*extra_);
+        applyTooltip(*extra_, tip_);
     }
     juce::Component* control() noexcept { return control_.get(); }
 
@@ -426,7 +456,7 @@ public:
     }
 
 private:
-    juce::String title_, desc_;
+    juce::String title_, desc_, tip_;
     bool badge_;
     std::unique_ptr<juce::Component> control_, extra_;
     int controlW_ = 0, controlH_ = 28, extraH_ = 0;
@@ -480,7 +510,9 @@ SettingsPanel::SettingsPanel(PentagritAudioProcessor& processor)
     tabs_ = std::make_unique<Segmented>(juce::StringArray{"Interface", "Audio", "Presets", "About & Support"},
                                         tab_, [this](int i) { showTab(i); });
     tabs_->setTitle("Settings tabs");
+    tabs_->setTooltip("Switch between the settings pages. The Left and Right arrow keys work too.");
     addAndMakeVisible(*tabs_);
+    done_.setTooltip("Close the settings (Esc).");
     addAndMakeVisible(done_);
     done_.onClick = [this]
     {
@@ -712,9 +744,10 @@ void SettingsPanel::buildInterface(Page& page)
 {
     const auto& s = settings_.get();
     auto addRow = [&page](const juce::String& title, const juce::String& desc,
-                          std::unique_ptr<juce::Component> c, int w, int h = kRowH)
+                          std::unique_ptr<juce::Component> c, int w, int h = kRowH,
+                          const juce::String& tip = {})
     {
-        auto row = std::make_unique<Row>(title, desc, false);
+        auto row = std::make_unique<Row>(title, desc, false, tip);
         row->setControl(std::move(c), w, 28);
         page.add(std::move(row), h);
     };
@@ -753,11 +786,12 @@ void SettingsPanel::buildInterface(Page& page)
     page.add(heading("Controls"), 28);
     addRow("Knob drag mode", {},
            seg({"Vertical", "Circular"}, s.knobMode == KnobMode::vertical ? 0 : 1,
-               [this](int i) {
+               [this](int i)
+               {
                    apply([i](UserSettings& u)
                          { u.knobMode = i == 0 ? KnobMode::vertical : KnobMode::circular; });
                }),
-           200, 44);
+           200, 44, "Vertical: drag up or down to turn a knob. Circular: drag around the knob.");
     {
         static constexpr float steps[] = {0.0f, 0.1f, 0.5f, 1.0f};
         int cur = 0;
@@ -788,7 +822,8 @@ void SettingsPanel::buildInterface(Page& page)
            seg({"Off", "0.5 s", "1 s", "2 s", "Infinite"},
                indexOf({0, 500, 1000, 2000, UserSettings::kInfiniteHold}, s.meterHoldMs, 2),
                [this](int i) { apply([i](UserSettings& u) { u.meterHoldMs = holds[i]; }); }),
-           340, 44);
+           340, 44,
+           "How long the meters hold their peak markers. Off hides the markers, Infinite never clears them.");
     addRow("Release speed", "How fast the meters fall.",
            std::make_unique<SliderControl>(
                5, 60, 1, static_cast<double>(s.meterRelease), [](double v)
@@ -798,11 +833,12 @@ void SettingsPanel::buildInterface(Page& page)
     addRow("Refresh rate", {},
            seg({"30 Hz", "60 Hz"}, s.meterRefreshHz == 60 ? 1 : 0,
                [this](int i) { apply([i](UserSettings& u) { u.meterRefreshHz = i == 0 ? 30 : 60; }); }),
-           170, 44);
+           170, 44, "How often the meters and readouts are redrawn. 60 Hz is smoother, 30 Hz uses less CPU.");
 
     page.add(heading("Footer"), 28);
     addRow("Show CPU readout", {},
-           sw(s.showCpu, [this](bool on) { apply([on](UserSettings& u) { u.showCpu = on; }); }), 38, 44);
+           sw(s.showCpu, [this](bool on) { apply([on](UserSettings& u) { u.showCpu = on; }); }), 38, 44,
+           "Show the CPU load of the plugin in the footer.");
 }
 
 void SettingsPanel::buildAudio(Page& page)
@@ -1039,9 +1075,10 @@ void SettingsPanel::buildAbout(Page& page)
 {
     const auto& s = settings_.get();
     auto textRow = [&page](const juce::String& title, const juce::String& desc,
-                           std::unique_ptr<juce::Component> c, int w, int h = 44)
+                           std::unique_ptr<juce::Component> c, int w, int h = 44,
+                           const juce::String& tip = {})
     {
-        auto row = std::make_unique<Row>(title, desc, false);
+        auto row = std::make_unique<Row>(title, desc, false, tip);
         if (c != nullptr)
         {
             row->setControl(std::move(c), w, 28);
@@ -1060,17 +1097,27 @@ void SettingsPanel::buildAbout(Page& page)
         };
         label->setText("AGPL-3.0-or-later", juce::dontSendNotification);
         label->setJustificationType(juce::Justification::centredRight);
-        textRow("Licence", {}, std::move(label), 200);
+        textRow("Licence", {}, std::move(label), 200, 44,
+                "Pentagrit is free software under the AGPL-3.0-or-later.");
     }
+    auto linkStyle = [](juce::HyperlinkButton& l, const Palette& p)
+    {
+        l.setColour(juce::HyperlinkButton::textColourId, p.band[4]);
+        l.setFont(fonts::sans(12.0f, fonts::Weight::medium), false, juce::Justification::centredRight);
+    };
     {
         auto link = std::make_unique<Styled<juce::HyperlinkButton>>("github.com/ivanerricis/pentagrit",
                                                                     juce::URL(kRepoUrl));
-        link->style = [](juce::HyperlinkButton& l, const Palette& p)
-        {
-            l.setColour(juce::HyperlinkButton::textColourId, p.band[4]);
-            l.setFont(fonts::sans(12.0f, fonts::Weight::medium), false, juce::Justification::centredRight);
-        };
-        textRow("Source code", {}, std::move(link), 260);
+        link->style = linkStyle;
+        textRow("Source code", {}, std::move(link), 260, 44,
+                "Open the Pentagrit repository on GitHub in your browser.");
+    }
+    {
+        auto link =
+            std::make_unique<Styled<juce::HyperlinkButton>>("Open the user guide", juce::URL(kGuideUrl));
+        link->style = linkStyle;
+        textRow("User guide", {}, std::move(link), 260, 44,
+                "Open the Pentagrit user guide (docs/GUIDE.md on GitHub) in your browser.");
     }
 
     page.add(heading("Support"), 28);

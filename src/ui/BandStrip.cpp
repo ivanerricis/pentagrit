@@ -21,7 +21,7 @@ void setupFreqLabel(juce::Label& l, const juce::String& title)
     l.setTitle(title);
     l.setJustificationType(juce::Justification::centred);
     l.setFont(fonts::mono(10.5f, fonts::Weight::regular));
-    l.setTooltip("Crossover frequency: type Hz or e.g. 1.2k");
+    l.setTooltip("Crossover frequency: click and type Hz or e.g. 1.2k, then press Enter.");
 }
 } // namespace
 
@@ -38,19 +38,22 @@ void BandStrip::Inner::paint(juce::Graphics& g)
 BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& meters, int bandIndex)
     : apvts_(apvts), meters_(meters), index_(bandIndex),
       attack_(apvts, bandParamID(bandIndex, BandParam::attack), "Attack",
-              "Attack gain in dB (boosts or softens the onset)", Fmt::dbSigned, true, 38),
+              "Attack gain, -24 to +24 dB: boosts or softens the onset of each hit.", Fmt::dbSigned, true,
+              38),
       sustain_(apvts, bandParamID(bandIndex, BandParam::sustain), "Sustain",
-               "Sustain gain in dB (boosts or tightens the tail)", Fmt::dbSigned, true, 38),
+               "Sustain gain, -24 to +24 dB: boosts or tightens the tail after each hit.", Fmt::dbSigned,
+               true, 38),
       speed_(apvts, bandParamID(bandIndex, BandParam::speed), "Speed",
-             "Detector speed, x0.25 (slow) to x4 (fast)", Fmt::speed, false, 38),
+             "Speed of the transient detector, x0.25 (slow) to x4 (fast).", Fmt::speed, false, 38),
       sat_(apvts, bandParamID(bandIndex, BandParam::satType),
            "Band " + juce::String(bandIndex + 1) + " saturation"),
       drive_(apvts, bandParamID(bandIndex, BandParam::drive), "Drive",
-             "Drive into the saturation curve (0 to 36 dB)", Fmt::dbUnit, false, 38),
-      mix_(apvts, bandParamID(bandIndex, BandParam::mix), "Mix", "Dry/wet of the saturation in this band",
-           Fmt::percent, false, 38),
-      gain_(apvts, bandParamID(bandIndex, BandParam::gain), "Gain", "Band output gain", Fmt::dbSignedUnit,
-            true, 42),
+             "Drive into the saturation curve, 0 to 36 dB.", Fmt::dbUnit, false, 38),
+      mix_(apvts, bandParamID(bandIndex, BandParam::mix), "Mix",
+           "Dry/wet of this band's shaper and saturation: 0% leaves the band untouched.", Fmt::percent, false,
+           38),
+      gain_(apvts, bandParamID(bandIndex, BandParam::gain), "Gain",
+            "Band output gain, after the shaper and saturation.", Fmt::dbSignedUnit, true, 42),
       knobs_{&attack_, &sustain_, &speed_, &drive_, &mix_, &gain_},
       muteRaw_(apvts.getRawParameterValue(bandParamID(bandIndex, BandParam::mute))),
       soloRaw_(apvts.getRawParameterValue(bandParamID(bandIndex, BandParam::solo))),
@@ -58,13 +61,16 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
 {
     const auto bn = "Band " + juce::String(index_ + 1);
     setTitle(bn);
-    setupToggle(mute_, "mute", bn + " mute", "Mute this band");
-    setupToggle(solo_, "solo", bn + " solo", "Solo this band");
-    setupToggle(bypass_, "bypass", bn + " bypass", "Bypass the processing of this band");
+    setupToggle(mute_, "mute", bn + " mute", "Mute this band. Solo on another band overrides it.");
+    setupToggle(solo_, "solo", bn + " solo",
+                "Solo this band: when any band is soloed, only soloed bands are heard.");
+    setupToggle(bypass_, "bypass", bn + " bypass",
+                "Bypass the shaper, saturation and mix of this band. Its gain, mute and solo still apply.");
     setupToggle(
         link_, "link", bn + " link",
         "Link this band: moving a knob of a linked band moves the same knob of the other linked bands "
-        "by the same amount (the saturation type is copied)");
+        "by the same amount, and the saturation type is copied. Mute, solo and bypass are never linked. "
+        "One undo step reverts the whole edit.");
     link_.onClick = [this]
     {
         if (onLinkToggled)
@@ -109,7 +115,7 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
                           "largest boost (right) and cut (left) of the last audio block; the markers hold "
                           "the extremes and the readout shows the held one.");
     transient_.setTitle(bn + " gain change");
-    meter_.setTooltip("Band output peak");
+    meter_.setTooltip("Band output peak level in dBFS, with peak hold.");
     meter_.setTitle(bn + " output level");
     for (auto* c : std::initializer_list<juce::Component*>{&transient_, &attack_, &sustain_, &speed_, &sat_,
                                                            &curve_, &drive_, &mix_, &gain_, &meter_})
@@ -119,7 +125,7 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
 
     sat_.onTypeChanged = [this](int t) { curve_.setType(t); };
     curve_.setType(sat_.type());
-    curve_.setTooltip("Saturation transfer curve (preview)");
+    curve_.setTooltip("Saturation transfer curve at the current drive (preview only).");
     curve_.setTitle(bn + " saturation curve");
     curve_.setDriveDb(driveRaw_->load());
     applyTheme();
