@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The per-band gain readout of the crossover display was hard to read over the peak bar (grey text on the band colour, next to the following band's tag); it now sits on a backing chip with full-contrast text.
 - The crossover display and the band strips stayed at 3 bands when the editor was opened on a session that already had 4 or 5 bands.
 - CLAP: loading a saved state now asks the host to re-read all parameter values, so hosts that cache them (and clap-validator's state-reproducibility tests) see the restored values.
 

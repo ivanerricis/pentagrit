@@ -327,11 +327,14 @@ void CrossoverDisplay::paint(juce::Graphics& g)
         if (x1 - x0 > 110.0f)
         {
             const float tg = tg_[static_cast<size_t>(b)];
-            g.setColour(p.ink2);
+            const juce::Rectangle<float> readout(x1 - 66.0f, plot.getY() + 4.0f, 60.0f, 14.0f);
+            // A backing chip keeps the text legible over the peak bar and clear of the next band's tag.
+            g.setColour(p.bg0.withAlpha(0.65f));
+            g.fillRoundedRectangle(readout.reduced(0.0f, 1.0f), 3.0f);
+            g.setColour(p.ink);
             g.setFont(fonts::mono(10.0f, fonts::Weight::regular));
             g.drawText((tg > 0.049f ? "+" : "") + juce::String(tg, 1) + " dB",
-                       juce::Rectangle<float>(x1 - 66.0f, plot.getY() + 4.0f, 60.0f, 14.0f).toNearestInt(),
-                       juce::Justification::centredRight, false);
+                       readout.reduced(3.0f, 0.0f).toNearestInt(), juce::Justification::centredRight, false);
         }
     }
 
