@@ -111,7 +111,8 @@ TEST_CASE("Band link: the saturation type is copied as is", "[bandlink]")
     automate(f.processor, 1, BandParam::satType, 0.0f);
     automate(f.processor, 2, BandParam::satType, 0.0f);
 
-    const float target = f.processor.getAPVTS().getParameter(bandParamID(0, BandParam::satType))->convertTo0to1(3.0f);
+    const float target =
+        f.processor.getAPVTS().getParameter(bandParamID(0, BandParam::satType))->convertTo0to1(3.0f);
     f.drag(0, BandParam::satType, {target});
     CHECK(val(f.processor, 0, BandParam::satType) == Approx(target));
     CHECK(val(f.processor, 1, BandParam::satType) == Approx(target));
