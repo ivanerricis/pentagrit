@@ -18,7 +18,8 @@ add_executable(PentagritTests
   UpdateTests.cpp
   PerfTests.cpp
   LookaheadTests.cpp
-  BandLinkTests.cpp)
+  BandLinkTests.cpp
+  DocsAssetsTests.cpp)
 
 target_link_libraries(PentagritTests PRIVATE PentagritCore Catch2::Catch2)
 target_include_directories(PentagritTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

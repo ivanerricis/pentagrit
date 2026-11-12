@@ -26,6 +26,17 @@ powershell -File scripts/dev/run-pluginval.ps1 -Vst3 path\to\Pentagrit.vst3
 
 On macOS also run `auval`; for CLAP use clap-validator (`scripts/ci/get_clap_validator.sh` downloads the pinned, checksum-verified release). CI runs all of these on every platform and a failure of any of them, clap-validator included, fails the build.
 
+## README screenshots and audio examples
+
+`tests/DocsAssetsTests.cpp` holds hidden Catch2 cases tagged `[.docs]` that never run in CI or in `ctest`. They render the editor (PNG at 1x and 2x, two styles, 3 and 5 bands, seeded meters) and "dry vs preset" audio pairs (OGG, loudness matched, latency compensated) through the real processor. `scripts/dev/make_docs_assets.sh [output-dir]` builds the test target and runs them (default output `docs/`, giving `images/` and `audio/`; it also works from Git Bash):
+
+```
+scripts/dev/make_docs_assets.sh
+PENTAGRIT_DOCS_SRC=/path/to/loops scripts/dev/make_docs_assets.sh   # also render your own *.wav loops
+```
+
+Without `PENTAGRIT_DOCS_DIR` the cases skip. The generated files are committed by hand when the README is updated.
+
 ## Formatting and lint
 
 `clang-format` (v18 in CI) with `.clang-format`. See `CONTRIBUTING.md`.
