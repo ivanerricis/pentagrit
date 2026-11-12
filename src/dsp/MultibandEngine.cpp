@@ -380,11 +380,18 @@ void MultibandEngine::process(juce::AudioBuffer<float>& buffer) noexcept
         if (b < numBands_)
         {
             meters_.bandTransientGainDb[i].store(bands_[i].getTransientGainDb(), std::memory_order_relaxed);
+            const auto range = bands_[i].consumeTransientGainRange();
+            meters_.bandTransientGainMinDb[i].store(coreCold_ ? 0.0f : range.minDb,
+                                                    std::memory_order_relaxed);
+            meters_.bandTransientGainMaxDb[i].store(coreCold_ ? 0.0f : range.maxDb,
+                                                    std::memory_order_relaxed);
         }
         else
         {
             meters_.bandPeakDb[i].store(kSilenceDb, std::memory_order_relaxed);
             meters_.bandTransientGainDb[i].store(0.0f, std::memory_order_relaxed);
+            meters_.bandTransientGainMinDb[i].store(0.0f, std::memory_order_relaxed);
+            meters_.bandTransientGainMaxDb[i].store(0.0f, std::memory_order_relaxed);
         }
     }
     meters_.autoGainDb.store(autoGain_.getCurrentGainDb(), std::memory_order_relaxed);

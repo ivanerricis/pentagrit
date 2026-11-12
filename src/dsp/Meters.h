@@ -20,6 +20,14 @@ struct MeterState
         {
             v.store(0.0f, std::memory_order_relaxed);
         }
+        for (auto& v : bandTransientGainMinDb)
+        {
+            v.store(0.0f, std::memory_order_relaxed);
+        }
+        for (auto& v : bandTransientGainMaxDb)
+        {
+            v.store(0.0f, std::memory_order_relaxed);
+        }
         constexpr std::array<float, 4> defaults{120.0f, 1200.0f, 3500.0f, 8000.0f};
         for (size_t i = 0; i < defaults.size(); ++i)
         {
@@ -28,6 +36,8 @@ struct MeterState
     }
 
     std::array<std::atomic<float>, kMaxBands> bandPeakDb, bandTransientGainDb;
+    // Smallest / largest transient gain (dB) of the band over the last host block (0 / 0 when idle).
+    std::array<std::atomic<float>, kMaxBands> bandTransientGainMinDb, bandTransientGainMaxDb;
     std::atomic<float> inPeakDb{-100}, outPeakDb{-100}, autoGainDb{0};
     std::array<std::atomic<float>, 4> effectiveXoverHz;
     std::atomic<int> latencySamples{0};

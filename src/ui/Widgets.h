@@ -193,22 +193,40 @@ private:
     juce::Path curve_;
 };
 
-// Centre-zero transient gain indicator (+-24 dB full scale)
+// Centre-zero gain-change meter (+-24 dB full scale). Fed with the smallest and largest transient gain of
+// the last host block: instant attack, release towards 0 dB, and hold markers for the largest boost and cut.
 class TransientIndicator final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
+    static constexpr float rangeDb = 24.0f;
+
     void setBandColour(juce::Colour c)
     {
         colour_ = c;
         repaint();
     }
-    void setGainDb(float db);
+    void setBallistics(float holdSec, float releaseDbPerSec)
+    {
+        holdSec_ = holdSec;
+        releaseDbPerSec_ = releaseDbPerSec;
+    }
+    // Feed the gain extremes (dB) of the last block and the time elapsed since the previous call.
+    void update(float minDb, float maxDb, float dtSec);
+
+    float displayMaxDb() const noexcept { return levelMax_; }
+    float displayMinDb() const noexcept { return levelMin_; }
+    float holdMaxDb() const noexcept { return holdMax_; }
+    float holdMinDb() const noexcept { return holdMin_; }
+    // Held extreme with the largest magnitude, e.g. "+6.3 dB" (the live extreme when hold is off).
+    juce::String readoutText() const;
 
     void paint(juce::Graphics&) override;
 
 private:
     juce::Colour colour_{juce::Colours::white};
-    float gainDb_ = 0.0f;
+    float levelMin_ = 0.0f, levelMax_ = 0.0f, holdMin_ = 0.0f, holdMax_ = 0.0f;
+    float holdMinAge_ = 0.0f, holdMaxAge_ = 0.0f;
+    float holdSec_ = 1.0f, releaseDbPerSec_ = 20.0f;
 };
 
 // Plain container that stretches its (single) child over its bounds. Used for the preset slot.

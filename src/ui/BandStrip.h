@@ -30,6 +30,8 @@ public:
         return {&attack_, &sustain_, &speed_};
     }
 
+    const TransientIndicator& transientIndicator() const noexcept { return transient_; }
+
     void resized() override;
     void paint(juce::Graphics&) override;
 

@@ -111,6 +111,77 @@ TEST_CASE("Attack boost raises the transient peak and returns to unity", "[trans
         REQUIRE(std::abs(r.gain[i]) <= 1.0f);
 }
 
+namespace
+{
+// Processes in blocks of `block` samples and returns the range consumed after every block.
+std::vector<pentagrit::GainRangeDb> blockRanges(const std::vector<float>& in, double fs, float atk, float sus,
+                                                int block)
+{
+    pentagrit::TransientShaper ts;
+    ts.prepare(fs, block, 1);
+    ts.setLowFrequencyHint(200.0f);
+    ts.setParameters(atk, sus, 0.5f);
+    auto buf = in;
+    std::vector<pentagrit::GainRangeDb> out;
+    for (size_t pos = 0; pos < buf.size(); pos += static_cast<size_t>(block))
+    {
+        const auto n = std::min<size_t>(static_cast<size_t>(block), buf.size() - pos);
+        float* ptr = buf.data() + pos;
+        juce::dsp::AudioBlock<float> b(&ptr, 1, n);
+        ts.process(b);
+        out.push_back(ts.consumeGainRange());
+    }
+    return out;
+}
+} // namespace
+
+TEST_CASE("Gain range: attack boost reaches the boost side only", "[transient]")
+{
+    const auto r = blockRanges(makeBurst(48000.0, 0.6), 48000.0, 12.0f, 0.0f, 512);
+    float mx = -100.0f, mn = 100.0f;
+    for (const auto& x : r)
+    {
+        mx = std::max(mx, x.maxDb);
+        mn = std::min(mn, x.minDb);
+    }
+    CHECK(mx > 6.0f);
+    CHECK(mn == Catch::Approx(0.0f).margin(0.05));
+}
+
+TEST_CASE("Gain range: sustain cut on a decaying tone reaches the cut side", "[transient]")
+{
+    const auto r = blockRanges(makeBurst(48000.0, 0.8), 48000.0, 0.0f, -12.0f, 512);
+    float mn = 100.0f;
+    for (const auto& x : r)
+    {
+        mn = std::min(mn, x.minDb);
+    }
+    CHECK(mn < -6.0f);
+}
+
+TEST_CASE("Gain range restarts from the current gain on every consume", "[transient]")
+{
+    pentagrit::TransientShaper ts;
+    ts.prepare(48000.0, 512, 1);
+    ts.setLowFrequencyHint(200.0f);
+    ts.setParameters(12.0f, 0.0f, 0.5f);
+    auto buf = makeBurst(48000.0, 0.4);
+    bool sawRange = false;
+    for (size_t pos = 0; pos + 256 <= buf.size(); pos += 256)
+    {
+        float* ptr = buf.data() + pos;
+        juce::dsp::AudioBlock<float> b(&ptr, 1, 256);
+        ts.process(b);
+        const auto r = ts.consumeGainRange();
+        sawRange = sawRange || r.maxDb - r.minDb > 3.0f;
+        // Nothing processed since: the range collapses to the current gain.
+        const auto again = ts.consumeGainRange();
+        CHECK(again.minDb == again.maxDb);
+        CHECK(again.maxDb == Catch::Approx(ts.getLastGainDb()));
+    }
+    CHECK(sawRange);
+}
+
 TEST_CASE("Sustain boost lifts the tail and leaves the onset", "[transient]")
 {
     const auto in = makeBurst(48000.0, 0.6);

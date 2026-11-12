@@ -1054,3 +1054,136 @@ TEST_CASE("AutoGain does not pump on bursty material", "[engine][autogain]")
         }
     }
 }
+
+namespace
+{
+struct GainRangeTrace
+{
+    // Per band, per host block.
+    std::array<std::vector<float>, kMaxBands> lo, hi;
+};
+
+GainRangeTrace renderGainRanges(MultibandEngine& e, const EngineSettings& s, Signal x, int block)
+{
+    GainRangeTrace t;
+    for (size_t pos = 0; pos < x.size(); pos += static_cast<size_t>(block))
+    {
+        float* ptr = x.data() + pos;
+        const int len = static_cast<int>(std::min<size_t>(static_cast<size_t>(block), x.size() - pos));
+        juce::AudioBuffer<float> buf(&ptr, 1, len);
+        e.setSettings(s);
+        e.process(buf);
+        for (size_t b = 0; b < static_cast<size_t>(kMaxBands); ++b)
+        {
+            t.lo[b].push_back(e.meters().bandTransientGainMinDb[b].load());
+            t.hi[b].push_back(e.meters().bandTransientGainMaxDb[b].load());
+        }
+    }
+    return t;
+}
+
+// 40 ms noise bursts every 250 ms over a -60 dB bed: plenty of transient gain movement.
+Signal gainMeterProgram(size_t n)
+{
+    Signal in = noise(n, 61, 0.001f);
+    const auto b = noise(n, 62, 0.5f);
+    for (size_t start = 12000; start + 1920 < n; start += 12000)
+    {
+        for (size_t i = start; i < start + 1920; ++i)
+        {
+            in[i] = b[i];
+        }
+    }
+    return in;
+}
+
+EngineSettings gainMeterSettings()
+{
+    auto s = neutral(OSFactor::x1, 3);
+    for (auto& b : s.bands)
+    {
+        b.attackDb = 12.0f;
+        b.sustainDb = -12.0f;
+    }
+    return s;
+}
+
+float maxOf(const std::vector<float>& v, size_t from = 0)
+{
+    return *std::max_element(v.begin() + static_cast<std::ptrdiff_t>(from), v.end());
+}
+
+float minOf(const std::vector<float>& v, size_t from = 0)
+{
+    return *std::min_element(v.begin() + static_cast<std::ptrdiff_t>(from), v.end());
+}
+} // namespace
+
+TEST_CASE("Gain-change meters report the per-block range and stay 0/0 for inactive bands", "[engine][meters]")
+{
+    const double sr = 48000.0;
+    const auto s = gainMeterSettings();
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto t = renderGainRanges(*e, s, gainMeterProgram(static_cast<size_t>(sr) * 4), 256);
+    for (size_t b = 0; b < 3; ++b)
+    {
+        INFO("band " << b);
+        CHECK(maxOf(t.hi[b]) > 3.0f);
+        CHECK(minOf(t.lo[b]) < -1.0f);
+        for (size_t i = 0; i < t.lo[b].size(); ++i)
+        {
+            REQUIRE(t.lo[b][i] <= t.hi[b][i]);
+        }
+    }
+    for (size_t b = 3; b < static_cast<size_t>(kMaxBands); ++b)
+    {
+        CHECK(maxOf(t.hi[b]) == 0.0f);
+        CHECK(minOf(t.lo[b]) == 0.0f);
+    }
+}
+
+TEST_CASE("Gain-change meters are 0/0 for a bypassed band", "[engine][meters]")
+{
+    const double sr = 48000.0;
+    auto s = gainMeterSettings();
+    s.bands[1].bypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto t = renderGainRanges(*e, s, gainMeterProgram(static_cast<size_t>(sr) * 4), 256);
+    CHECK(maxOf(t.hi[0]) > 3.0f);
+    CHECK(maxOf(t.hi[2]) > 3.0f);
+    // The band is settled (cold) after the bypass crossfade.
+    CHECK(maxOf(t.hi[1], 8) == 0.0f);
+    CHECK(minOf(t.lo[1], 8) == 0.0f);
+}
+
+TEST_CASE("Gain-change meters are 0/0 with the full bypass engaged", "[engine][meters]")
+{
+    const double sr = 48000.0;
+    auto s = gainMeterSettings();
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto in = gainMeterProgram(static_cast<size_t>(sr) * 4);
+    renderGainRanges(*e, s, in, 256);
+    s.bypass = true;
+    const auto t = renderGainRanges(*e, s, in, 256);
+    // After the bypass crossfade every band reads 0/0.
+    for (size_t b = 0; b < static_cast<size_t>(kMaxBands); ++b)
+    {
+        INFO("band " << b);
+        CHECK(maxOf(t.hi[b], 8) == 0.0f);
+        CHECK(minOf(t.lo[b], 8) == 0.0f);
+    }
+}
+
+TEST_CASE("Gain-change meters are 0/0 for a signal below the -70 dBFS gate", "[engine][meters]")
+{
+    const double sr = 48000.0;
+    const auto s = gainMeterSettings();
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto t = renderGainRanges(*e, s, noise(static_cast<size_t>(sr) * 2, 71, 1.0e-4f), 256); // -80 dBFS
+    for (size_t b = 0; b < static_cast<size_t>(kMaxBands); ++b)
+    {
+        INFO("band " << b);
+        CHECK(std::abs(maxOf(t.hi[b])) < 0.01f);
+        CHECK(std::abs(minOf(t.lo[b])) < 0.01f);
+    }
+}

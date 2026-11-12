@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Per-band gain-change meters: the indicator at the top of every band strip is now a bipolar meter of the transient shaper's gain (+-24 dB) that reacts instantly to the largest boost and cut of each audio block, falls back to 0 dB at the meter release speed and keeps hold markers (meter hold time) for the largest boost and cut; the readout shows the held extreme.
+
 ### Changed
 
 ### Fixed

@@ -425,3 +425,86 @@ TEST_CASE("Transient knob captions keep a gap at 2 to 5 bands in every style", "
         }
     }
 }
+
+TEST_CASE("Gain-change meter holds the extremes and releases towards 0 dB", "[gui][Editor]")
+{
+    PentagritAudioProcessor processor;
+    PentagritAudioProcessorEditor editor(processor);
+    auto& m = processor.getMeters();
+    const auto& ind = editor.getStrip(0).transientIndicator();
+
+    ui::UiOptions o;
+    o.meterHoldSec = -1.0f; // infinite hold
+    o.meterReleaseDbPerSec = 1.0e6f;
+    editor.setUiOptions(o);
+    editor.refreshNow();
+    CHECK(ind.displayMaxDb() == 0.0f);
+    CHECK(ind.displayMinDb() == 0.0f);
+
+    m.bandTransientGainMinDb[0].store(-3.0f);
+    m.bandTransientGainMaxDb[0].store(6.0f);
+    editor.refreshNow();
+    CHECK(ind.displayMaxDb() == Catch::Approx(6.0f));
+    CHECK(ind.displayMinDb() == Catch::Approx(-3.0f));
+    CHECK(ind.readoutText() == "+6.0 dB");
+
+    // Back to idle: the bar releases (fast here), the markers stay.
+    m.bandTransientGainMinDb[0].store(0.0f);
+    m.bandTransientGainMaxDb[0].store(0.0f);
+    editor.refreshNow();
+    CHECK(ind.displayMaxDb() == Catch::Approx(0.0f));
+    CHECK(ind.displayMinDb() == Catch::Approx(0.0f));
+    CHECK(ind.holdMaxDb() == Catch::Approx(6.0f));
+    CHECK(ind.holdMinDb() == Catch::Approx(-3.0f));
+    CHECK(ind.readoutText() == "+6.0 dB");
+
+    // A deeper cut than the held boost becomes the readout.
+    m.bandTransientGainMinDb[0].store(-9.0f);
+    editor.refreshNow();
+    CHECK(ind.holdMinDb() == Catch::Approx(-9.0f));
+    CHECK(ind.readoutText() == "-9.0 dB");
+
+    // Hold off: markers follow the bar.
+    o.meterHoldSec = 0.0f;
+    editor.setUiOptions(o);
+    m.bandTransientGainMinDb[0].store(0.0f);
+    editor.refreshNow();
+    CHECK(ind.holdMinDb() == 0.0f);
+    CHECK(ind.readoutText() == "0.0 dB");
+
+    // Slow release: the bar falls gradually instead of jumping.
+    o.meterHoldSec = 1.0f;
+    o.meterReleaseDbPerSec = 1.0f;
+    editor.setUiOptions(o);
+    m.bandTransientGainMaxDb[0].store(12.0f);
+    editor.refreshNow();
+    m.bandTransientGainMaxDb[0].store(0.0f);
+    editor.refreshNow();
+    CHECK(ind.displayMaxDb() > 11.0f);
+}
+
+TEST_CASE("Gain-change meters stay readable at 5 bands in compact layout and every style", "[gui][Editor]")
+{
+    PentagritAudioProcessor processor;
+    PentagritAudioProcessorEditor editor(processor);
+    setValue(processor, pid::numBands, 5.0f);
+    for (int si = 0; si < ui::kNumStyles; ++si)
+    {
+        for (auto layout : {ui::Layout::full, ui::Layout::compact})
+        {
+            ui::UiOptions o;
+            o.style = static_cast<ui::Style>(si);
+            o.layout = layout;
+            editor.setUiOptions(o);
+            editor.refreshNow();
+            for (int b = 0; b < 5; ++b)
+            {
+                const auto& ind = editor.getStrip(b).transientIndicator();
+                INFO("style " << si << " band " << b);
+                // Room for the readout (46 px) and a bar of at least 60 px.
+                CHECK(ind.getWidth() >= 46 + 60);
+                CHECK(ind.getHeight() >= 12);
+            }
+        }
+    }
+}

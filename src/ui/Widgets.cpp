@@ -558,14 +558,56 @@ void CurvePreview::paint(juce::Graphics& g)
 
 // ============================== TransientIndicator
 // ===========================================================
-void TransientIndicator::setGainDb(float db)
+void TransientIndicator::update(float minDb, float maxDb, float dt)
 {
-    db = juce::jlimit(-24.0f, 24.0f, db);
-    if (std::abs(db - gainDb_) > 0.04f)
+    const float prev[4] = {levelMin_, levelMax_, holdMin_, holdMax_};
+    // The meter is bipolar around 0 dB: a block that only boosts has no cut part and vice versa.
+    const float lo = juce::jlimit(-rangeDb, 0.0f, minDb);
+    const float hi = juce::jlimit(0.0f, rangeDb, maxDb);
+    const float fall = releaseDbPerSec_ * dt;
+
+    levelMax_ = hi >= levelMax_ ? hi : juce::jmax(hi, levelMax_ - fall);
+    levelMin_ = lo <= levelMin_ ? lo : juce::jmin(lo, levelMin_ + fall);
+
+    auto hold = [this, fall, dt](float& held, float& age, float level, float live, bool boost)
     {
-        gainDb_ = db;
-        repaint();
+        if (holdSec_ == 0.0f)
+        {
+            held = 0.0f;
+            return;
+        }
+        if (boost ? live >= held : live <= held)
+        {
+            held = live;
+            age = 0.0f;
+            return;
+        }
+        age += dt;
+        if (holdSec_ > 0.0f && age > holdSec_)
+        {
+            held = boost ? juce::jmax(level, held - fall) : juce::jmin(level, held + fall);
+        }
+    };
+    hold(holdMax_, holdMaxAge_, levelMax_, hi, true);
+    hold(holdMin_, holdMinAge_, levelMin_, lo, false);
+
+    const float cur[4] = {levelMin_, levelMax_, holdMin_, holdMax_};
+    for (int i = 0; i < 4; ++i)
+    {
+        if (std::abs(cur[i] - prev[i]) > 0.04f)
+        {
+            repaint();
+            break;
+        }
     }
+}
+
+juce::String TransientIndicator::readoutText() const
+{
+    const float mx = holdSec_ == 0.0f ? levelMax_ : holdMax_;
+    const float mn = holdSec_ == 0.0f ? levelMin_ : holdMin_;
+    const float v = mx >= -mn ? mx : mn;
+    return (v > 0.049f ? "+" : "") + juce::String(v, 1) + " dB";
 }
 
 void TransientIndicator::paint(juce::Graphics& g)
@@ -575,18 +617,37 @@ void TransientIndicator::paint(juce::Graphics& g)
     auto text = b.removeFromRight(46.0f);
     g.setColour(p.ink2);
     g.setFont(fonts::mono(10.0f, fonts::Weight::regular));
-    g.drawText((gainDb_ > 0.049f ? "+" : "") + juce::String(gainDb_, 1) + " dB", text.toNearestInt(),
-               juce::Justification::centredRight, false);
+    g.drawText(readoutText(), text.toNearestInt(), juce::Justification::centredRight, false);
 
     auto bar = b.withSizeKeepingCentre(b.getWidth() - 4.0f, 6.0f);
-    g.setColour(p.bg2);
+    g.setColour(p.bg0.getBrightness() > 0.5f ? p.bg3 : p.bg2);
     g.fillRoundedRectangle(bar, 3.0f);
     const float cx = bar.getCentreX();
-    const float x = cx + gainDb_ / 24.0f * bar.getWidth() * 0.5f;
+    const float halfW = bar.getWidth() * 0.5f;
+    auto xOf = [cx, halfW](float db) { return cx + db / rangeDb * halfW; };
+
+    // Boost to the right in the band colour, cut to the left in a dimmer tone of it.
     g.setColour(colour_);
-    g.fillRect(juce::Rectangle<float>(juce::jmin(cx, x), bar.getY(), std::abs(x - cx), bar.getHeight()));
+    g.fillRect(juce::Rectangle<float>(cx, bar.getY(), xOf(levelMax_) - cx, bar.getHeight()));
+    g.setColour(colour_.withAlpha(0.55f));
+    g.fillRect(juce::Rectangle<float>(xOf(levelMin_), bar.getY(), cx - xOf(levelMin_), bar.getHeight()));
+
     g.setColour(p.ink3);
     g.fillRect(cx - 0.5f, bar.getY() - 2.0f, 1.0f, bar.getHeight() + 4.0f);
+
+    // Hold markers: largest boost and largest cut, taller than the bar so they stay visible over it.
+    if (holdSec_ != 0.0f)
+    {
+        g.setColour(p.ink);
+        if (holdMax_ > 0.05f)
+        {
+            g.fillRect(xOf(holdMax_) - 1.0f, bar.getY() - 2.0f, 1.5f, bar.getHeight() + 4.0f);
+        }
+        if (holdMin_ < -0.05f)
+        {
+            g.fillRect(xOf(holdMin_) - 0.5f, bar.getY() - 2.0f, 1.5f, bar.getHeight() + 4.0f);
+        }
+    }
 }
 
 // ============================== xover helpers

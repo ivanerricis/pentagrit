@@ -27,6 +27,8 @@ public:
     void setSettings(const BandSettings& settings, bool audible, float lowFreqHintHz) noexcept;
     void process(const juce::dsp::AudioBlock<float>& block) noexcept;
     float getTransientGainDb() const noexcept;
+    // Transient gain range (dB) since the last call; 0/0 while the band is fully bypassed (cold).
+    GainRangeDb consumeTransientGainRange() noexcept;
 
 private:
     TransientShaper transient_;

@@ -217,4 +217,10 @@ float BandProcessor::getTransientGainDb() const noexcept
 {
     return transient_.getLastGainDb();
 }
+
+GainRangeDb BandProcessor::consumeTransientGainRange() noexcept
+{
+    const auto r = transient_.consumeGainRange();
+    return cold_ ? GainRangeDb{} : r;
+}
 } // namespace pentagrit
