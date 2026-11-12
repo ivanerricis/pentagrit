@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- CI runs clap-validator on Windows, Linux and macOS and a failure now fails the build (it was advisory). The download script extracts the nested Linux and macOS archives and verifies a pinned SHA-256, and the validator output is uploaded with the validation logs.
+
 ### Fixed
 
 - CLAP: loading a saved state now asks the host to re-read all parameter values, so hosts that cache them (and clap-validator's state-reproducibility tests) see the restored values.

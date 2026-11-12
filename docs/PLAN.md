@@ -68,7 +68,7 @@ Globali: `inGain`, `outGain`, `mix`, `autoGain`, `oversampling`, `numBands`, `xo
 Ordine: WP0 → (WP1, WP2, WP3, WP4-su-stub, WP5a, WP6, WP7, WP8 in parallelo; WP5b dopo approvazione mockup) → merge WP1–3 → WP4 → WP5b → WP8 → integrazione finale (pluginval strictness 10 su 3 OS, tag `v0.1.0`). Max 3–4 agenti simultanei sulla stessa macchina (build JUCE ~3–6 min ciascuno), `-j` = metà dei core, cache CPM condivisa.
 
 ## CI/CD (WP6)
-- `build.yml` riusabile: matrix windows-2022 (Ninja+MSVC, sccache), macos-14 (universal, ccache), ubuntu-22.04 (ccache, xvfb); build Release, ctest, pluginval strictness 10 sul VST3, `auval` su macOS, clap-validator (advisory), artifact.
+- `build.yml` riusabile: matrix windows-2022 (Ninja+MSVC, sccache), macos-14 (universal, ccache), ubuntu-22.04 (ccache, xvfb); build Release, ctest, pluginval strictness 10 sul VST3, `auval` su macOS, clap-validator (bloccante su tutte e tre le piattaforme), artifact.
 - `ci.yml`: PR + push su main, concurrency cancel, lint (clang-format 18, titolo PR conventional commit), clang-tidy e sanitizer bloccanti; macOS solo su main / label `ci:macos` (minuti ×10 su piano Free).
 - `release.yml`: tag `v*` → verifica versione = CMake → build 3 OS + zip (VST3, CLAP, AU, Standalone, LICENSE) → note da git-cliff → GitHub Release. Azioni pinnate per SHA. macOS: firma ad-hoc ora; firma/notarizzazione Apple in fase 2 (`docs/MACOS_SIGNING.md`, serve account Apple Developer).
 - Branch protection: ruleset via `gh api` (PR obbligatoria, check richiesti, squash only); su repo privato Free potrebbe richiedere Pro → documentato.
@@ -84,7 +84,7 @@ Ordine: WP0 → (WP1, WP2, WP3, WP4-su-stub, WP5a, WP6, WP7, WP8 in parallelo; W
 
 ## Verifica
 - Unit test Catch2: crossover (somma piatta ±0.01 dB, −6 dB a fc, pendenza), transient (burst, sine stazionaria, speed, consistenza 1x/4x, NaN), saturator (curve, armoniche, DC, continuità), autogain (convergenza, clamp), engine (flatness, latenza = bypass, mix phase-matched, aliasing 8x vs 1x, chunking, fuzz), allocazioni = 0 in processBlock, parametri/stato/preset round-trip, editor lifecycle.
-- CI: pluginval 10 (3 OS), auval, clap-validator.
+- CI: pluginval 10 (3 OS), auval, clap-validator (3 OS); tutti bloccanti.
 - Manuale (utente): carica VST3 e CLAP in Reaper su Windows, controlla compensazione latenza, automazione, salvataggio progetto, CPU a 8x, preset.
 - Dry run release: tag `v0.1.0-rc1`.
 

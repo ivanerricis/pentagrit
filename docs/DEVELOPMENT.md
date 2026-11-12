@@ -24,7 +24,7 @@ Debug build: `cmake --build --preset win-vs-debug`. Presets set `CMAKE_POLICY_VE
 powershell -File scripts/dev/run-pluginval.ps1 -Vst3 path\to\Pentagrit.vst3
 ```
 
-On macOS also run `auval`; for CLAP use clap-validator. CI runs all of these.
+On macOS also run `auval`; for CLAP use clap-validator (`scripts/ci/get_clap_validator.sh` downloads the pinned, checksum-verified release). CI runs all of these on every platform and a failure of any of them, clap-validator included, fails the build.
 
 ## Formatting and lint
 

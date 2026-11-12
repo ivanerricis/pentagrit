@@ -155,15 +155,21 @@ jobs:
           killall -9 AudioComponentRegistrar || true
           auval -v aufx Pgrt Ivnr
 
-      - name: clap-validator (advisory)
-        continue-on-error: true
+      - name: clap-validator
         shell: bash
         run: |
+          if [[ -z "${CLAP_PATH:-}" ]]; then
+            echo "::error::CLAP artefact (Pentagrit.clap) not found in the build tree; cannot run clap-validator"
+            find "build/${{ matrix.preset }}" -maxdepth 3 -name '*_artefacts*'
+            exit 1
+          fi
           validator="$(scripts/ci/get_clap_validator.sh "${{ matrix.tools_os }}")"
+          mkdir -p clap-validator-logs
+          # CLAP_PATH is the .clap file (Windows, Linux) or the .clap bundle directory (macOS).
           if [[ "${{ matrix.name }}" == linux ]]; then
-            xvfb-run -a "$validator" validate "$CLAP_PATH"
+            xvfb-run -a "$validator" validate "$CLAP_PATH" 2>&1 | tee clap-validator-logs/clap-validator.log
           else
-            "$validator" validate "$CLAP_PATH"
+            "$validator" validate "$CLAP_PATH" 2>&1 | tee clap-validator-logs/clap-validator.log
           fi
 
       - name: Package
@@ -207,6 +213,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: validation-logs-${{ matrix.name }}
-          path: pluginval-logs
+          path: |
+            pluginval-logs
+            clap-validator-logs
           retention-days: 7
           if-no-files-found: ignore
