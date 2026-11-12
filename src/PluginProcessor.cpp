@@ -318,6 +318,11 @@ void PentagritAudioProcessor::setStateInformation(const void* data, int sizeInBy
     migrateState(tree, version);
     apvts_.replaceState(tree);
     clearUndoHistory(); // the whole state was replaced: older steps no longer apply
+
+    // Tell the host that every parameter value changed. A CLAP host caches the values and only re-reads them
+    // after a params rescan (CLAP_PARAM_RESCAN_VALUES, which the wrapper sends for programChanged); without
+    // it clap-validator reports "parameter values changed without a rescan request".
+    updateHostDisplay(ChangeDetails().withProgramChanged(true));
 }
 
 void PentagritAudioProcessor::migrateState(juce::ValueTree&, int)

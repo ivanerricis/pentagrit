@@ -2,6 +2,8 @@
 #include "PluginProcessor.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <thread>
+#include <vector>
 
 using namespace pentagrit;
 using Catch::Approx;
@@ -128,4 +130,126 @@ TEST_CASE("Future-version state is rejected, old and version-less states load", 
         CHECK(raw(p, pid::numBands) == Approx(5.0f));
         CHECK(raw(p, pid::inGain) == Approx(-6.0f).margin(0.05f));
     }
+}
+
+TEST_CASE("State reproduces every parameter set without message-loop pumping", "[state]")
+{
+    // Mirrors the clap-validator state-reproducibility tests: parameters are changed the way a host
+    // does (setValueNotifyingHost, no message loop in between), the state is saved, loaded into a fresh
+    // instance and every value is compared; saving again must give the same bytes.
+    PentagritAudioProcessor a;
+    const auto& params = a.getParameters();
+    REQUIRE(params.size() == kNumParameters);
+
+    juce::Random rng(0x5EED);
+    for (auto* p : params)
+    {
+        // Snap to the parameter's own grid (steps, choices, switches) like a host that sends valid values.
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p);
+        REQUIRE(ranged != nullptr);
+        const float v = ranged->convertTo0to1(ranged->convertFrom0to1(rng.nextFloat()));
+        p->setValueNotifyingHost(v);
+    }
+
+    juce::MemoryBlock saved;
+    a.getStateInformation(saved);
+    REQUIRE(saved.getSize() > 0);
+
+    PentagritAudioProcessor b;
+    b.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+
+    REQUIRE(b.getParameters().size() == params.size());
+    for (int i = 0; i < params.size(); ++i)
+    {
+        auto* pa = params[i];
+        auto* pb = b.getParameters()[i];
+        INFO(pa->getName(64).toStdString() << " " << pa->getValue() << " vs " << pb->getValue());
+        CHECK(pb->getValue() == Approx(pa->getValue()).margin(1e-6));
+        const auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(pa);
+        REQUIRE(withId != nullptr);
+        CHECK(raw(b, withId->paramID) == Approx(raw(a, withId->paramID)).margin(1e-6));
+    }
+
+    juce::MemoryBlock again;
+    b.getStateInformation(again);
+    CHECK(again == saved);
+}
+
+TEST_CASE("State reproduces parameters set from the audio thread like the CLAP wrapper does", "[state]")
+{
+    PentagritAudioProcessor a;
+    a.setPlayConfigDetails(2, 2, 48000.0, 512);
+    a.prepareToPlay(48000.0, 512);
+    const auto& params = a.getParameters();
+
+    juce::Random rng(0xC1A9);
+    std::vector<float> expected;
+    for (auto* p : params)
+    {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p);
+        expected.push_back(ranged->convertTo0to1(ranged->convertFrom0to1(rng.nextFloat())));
+    }
+
+    std::thread audio(
+        [&]
+        {
+            // Same calls as clap-juce-extensions::paramSetValueAndNotifyIfChanged, followed by one block.
+            for (int i = 0; i < params.size(); ++i)
+            {
+                auto* p = params[i];
+                if (p->getValue() == expected[static_cast<size_t>(i)])
+                    continue;
+                p->setValue(expected[static_cast<size_t>(i)]);
+                p->sendValueChangedMessageToListeners(expected[static_cast<size_t>(i)]);
+            }
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            juce::MidiBuffer midi;
+            a.processBlock(buffer, midi);
+        });
+    audio.join();
+
+    juce::MemoryBlock saved;
+    a.getStateInformation(saved);
+
+    PentagritAudioProcessor b;
+    b.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+    for (int i = 0; i < params.size(); ++i)
+    {
+        INFO(params[i]->getName(64).toStdString());
+        CHECK(b.getParameters()[i]->getValue() == Approx(expected[static_cast<size_t>(i)]).margin(1e-6));
+    }
+}
+
+TEST_CASE("Loading a state tells the host that the parameter values changed", "[state]")
+{
+    // A CLAP host caches parameter values and re-reads them only after a values rescan, which the wrapper
+    // sends for a programChanged notification (clap-validator: state-reproducibility-*).
+    struct Spy final : juce::AudioProcessorListener
+    {
+        void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override {}
+        void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& details) override
+        {
+            programChanged = programChanged || details.programChanged;
+        }
+        bool programChanged = false;
+    };
+
+    PentagritAudioProcessor a;
+    setValue(a, pid::inGain, -6.0f);
+    juce::MemoryBlock block;
+    a.getStateInformation(block);
+
+    PentagritAudioProcessor b;
+    Spy spy;
+    b.addListener(&spy);
+    b.setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+    CHECK(spy.programChanged);
+
+    // A rejected state changes nothing and says nothing.
+    spy.programChanged = false;
+    const char junk[] = "not a state";
+    b.setStateInformation(junk, static_cast<int>(sizeof(junk)));
+    CHECK_FALSE(spy.programChanged);
+    b.removeListener(&spy);
 }

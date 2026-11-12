@@ -41,6 +41,7 @@ State is the APVTS value tree as XML, tag `PENTAGRIT_STATE`, plus the UI size (`
 
 - `getStateInformation` always writes `stateVersion`.
 - `setStateInformation` ignores a state whose `stateVersion` is newer than the running plugin's; a missing version counts as 1; older versions go through `PentagritAudioProcessor::migrateState(tree, fromVersion)` (a no-op today: add `if (fromVersion < N)` steps there when `kStateVersion` is bumped) before `replaceState`.
+- After `replaceState`, `setStateInformation` calls `updateHostDisplay` with `programChanged`; the CLAP wrapper turns that into `clap_host_params::rescan(CLAP_PARAM_RESCAN_VALUES)`. A CLAP host caches parameter values and clap-validator (state-reproducibility tests) fails a state load that changes values without this rescan. The save/restore itself is correct (covered by `StateTests.cpp`).
 - Presets carry their own `stateVersion` and newer ones are rejected as well.
 - Parameter IDs and `kParamVersion` never change (see above).
 
