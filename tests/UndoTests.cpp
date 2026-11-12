@@ -279,8 +279,8 @@ TEST_CASE("Undo: the top bar buttons follow the history and drive it", "[undo][g
     editor.refreshNow();
     CHECK_FALSE(top.undoButton().isEnabled());
     CHECK_FALSE(top.redoButton().isEnabled());
-    CHECK(top.undoButton().getTooltip() == "Undo");
-    CHECK(top.redoButton().getTooltip() == "Redo");
+    CHECK(top.undoButton().getTooltip().startsWith("Undo"));
+    CHECK(top.redoButton().getTooltip().startsWith("Redo"));
 
     editor.getStrip(0); // strips exist
     ui::LabelledKnob knob(processor.getAPVTS(), pid::inGain, "In", "hint",

@@ -52,15 +52,19 @@ TopBar::TopBar(juce::AudioProcessorValueTreeState& apvts, MeterState& meters,
                std::function<double()> sampleRate)
     : meters_(meters), sampleRate_(std::move(sampleRate)),
       bands_(*apvts.getParameter(pid::numBands), juce::StringArray{"2", "3", "4", "5"}, 2, "Bands",
-             "Number of crossover bands (2 to 5)"),
+             "Number of crossover bands, 2 to 5. Not automatable."),
       os_(*apvts.getParameter(pid::oversampling), juce::StringArray{"Off", "2x", "4x", "8x"}, 0,
-          "Oversampling", "Oversampling factor of the whole processing chain (adds latency)")
+          "Oversampling",
+          "Oversampling of the whole processing chain: Off, 2x, 4x or 8x. Less aliasing from the "
+          "saturators, more latency and CPU. Not automatable.")
 {
     setTitle("Top bar");
     addAndMakeVisible(presetSlot_);
     presetSlot_.setTitle("Preset slot");
     addAndMakeVisible(bands_);
     addAndMakeVisible(os_);
+    undo_.setTooltip("Undo the last parameter change (Ctrl/Cmd+Z).");
+    redo_.setTooltip("Redo the change you undid (Ctrl/Cmd+Shift+Z or Ctrl+Y).");
     for (auto* b : {&undo_, &redo_})
     {
         b->setEnabled(false);
@@ -83,13 +87,14 @@ TopBar::TopBar(juce::AudioProcessorValueTreeState& apvts, MeterState& meters,
 
     autoGain_.getProperties().set(prop::kind, "pill");
     autoGain_.setTitle("Auto-gain");
-    autoGain_.setTooltip("Auto-gain: keeps the output level matched to the input");
+    autoGain_.setTooltip(
+        "Auto-gain: keeps the output level matched to the input level (up to +-24 dB of correction).");
     bypass_.getProperties().set(prop::kind, "warn");
     bypass_.setTitle("Bypass");
-    bypass_.setTooltip("Global bypass (delay-compensated, 20 ms crossfade)");
+    bypass_.setTooltip("Bypass the whole plugin. The bypass is delay-compensated and fades over 20 ms.");
     gear_.getProperties().set(prop::kind, "gear");
     gear_.setTitle("Settings");
-    gear_.setTooltip("Settings: interface, audio, presets, about");
+    gear_.setTooltip("Open the settings: interface, audio, presets, and about with the user guide.");
     gear_.setClickingTogglesState(false);
     gear_.onClick = [this]
     {
@@ -138,6 +143,15 @@ void TopBar::tick()
     latencyText_ = sr > 0.0 ? juce::String(ms, ms >= 100.0 ? 0 : 1) + " ms  " + juce::String(lat) + " smp"
                             : juce::String(lat) + " smp";
     repaint(latencyArea_);
+}
+
+juce::String TopBar::getTooltip()
+{
+    if (latencyArea_.contains(getMouseXYRelative()))
+    {
+        return "Latency reported to the host, compensated by it. It grows with oversampling and lookahead.";
+    }
+    return {};
 }
 
 void TopBar::resized()

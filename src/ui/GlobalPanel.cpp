@@ -8,12 +8,13 @@ using Fmt = LabelledKnob::Fmt;
 GlobalPanel::GlobalPanel(PentagritAudioProcessor& processor)
     : processor_(processor), meters_(processor.getMeters()),
       autoGainOn_(processor.getAPVTS().getRawParameterValue(pid::autoGain)),
-      in_(processor.getAPVTS(), pid::inGain, "In", "Input gain, before the crossover", Fmt::dbSignedUnit,
+      in_(processor.getAPVTS(), pid::inGain, "In", "Input gain, before the crossover.", Fmt::dbSignedUnit,
           true, 44),
-      out_(processor.getAPVTS(), pid::outGain, "Out", "Output gain, after the global mix", Fmt::dbSignedUnit,
+      out_(processor.getAPVTS(), pid::outGain, "Out", "Output gain, after the global mix.", Fmt::dbSignedUnit,
            true, 44),
-      mix_(processor.getAPVTS(), pid::mix, "Mix", "Global dry/wet (phase-matched dry)", Fmt::percent, false,
-           44)
+      mix_(processor.getAPVTS(), pid::mix, "Mix",
+           "Global dry/wet mix. The dry path is phase-matched, so partial mixes stay clean.", Fmt::percent,
+           false, 44)
 {
     auto& apvts = processor.getAPVTS();
     setTitle("Master");
@@ -24,7 +25,7 @@ GlobalPanel::GlobalPanel(PentagritAudioProcessor& processor)
     driveComp_.getProperties().set(prop::kind, "pill");
     driveComp_.setTitle("Drive compensation");
     driveComp_.setTooltip(
-        "Drive compensation: keeps the level of quiet signals constant while you raise the drive");
+        "Drive compensation: keeps the level of quiet signals constant while you raise the drive.");
     driveComp_.setWantsKeyboardFocus(true);
     addAndMakeVisible(driveComp_);
     driveCompAtt_ = std::make_unique<juce::ButtonParameterAttachment>(*apvts.getParameter(pid::driveComp),
@@ -32,8 +33,8 @@ GlobalPanel::GlobalPanel(PentagritAudioProcessor& processor)
     delta_.getProperties().set(prop::kind, "pill");
     delta_.setTitle("Delta monitoring");
     delta_.setTooltip(
-        "Delta: listen only to what the plugin changes (processed minus dry). Handy to hear what "
-        "you add or remove. Not saved with the project; Bypass wins");
+        "Delta: listen only to what the plugin changes (processed minus dry), to hear what you add "
+        "or remove. Not saved with the project; Bypass wins.");
     delta_.setWantsKeyboardFocus(true);
     delta_.onClick = [this]
     {
@@ -45,7 +46,7 @@ GlobalPanel::GlobalPanel(PentagritAudioProcessor& processor)
     matchBypass_.setTooltip(
         "Match bypass: while on, Bypass is scaled to the level the plugin output had, so "
         "A/B compares tone and not loudness. Live playback only (offline renders keep the "
-        "exact bypass). Kept in your settings, not in the project");
+        "exact bypass). Kept in your settings, not in the project.");
     matchBypass_.setWantsKeyboardFocus(true);
     matchBypass_.onClick = [this]
     {
@@ -56,9 +57,9 @@ GlobalPanel::GlobalPanel(PentagritAudioProcessor& processor)
     };
     addAndMakeVisible(delta_);
     addAndMakeVisible(matchBypass_);
-    inMeter_.setTooltip("Input peak level");
+    inMeter_.setTooltip("Input peak level in dBFS, with peak hold.");
     inMeter_.setTitle("Input level");
-    outMeter_.setTooltip("Output peak level");
+    outMeter_.setTooltip("Output peak level in dBFS, with peak hold. Tinted while Delta is on.");
     outMeter_.setTitle("Output level");
     applyTheme();
 }

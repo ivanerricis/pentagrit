@@ -25,7 +25,7 @@ private:
 
 // Top bar: logo, [preset slot for WP8's PresetBar], bands selector, oversampling selector, latency readout,
 // AUTO-GAIN, BYPASS and the settings gear.
-class TopBar final : public juce::Component
+class TopBar final : public juce::Component, public juce::TooltipClient
 {
 public:
     // `sampleRate` is queried for the latency readout in ms (may return 0 when unknown).
@@ -57,6 +57,8 @@ public:
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    // Tooltip of the latency readout (it is painted, not a child component); empty elsewhere.
+    juce::String getTooltip() override;
 
     static void drawLogoMark(juce::Graphics&, juce::Rectangle<float> area, const Palette&);
 

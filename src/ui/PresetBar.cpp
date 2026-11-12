@@ -31,12 +31,12 @@ PresetBar::PresetBar(PresetManager& manager) : manager_(manager)
         addAndMakeVisible(*b);
     }
 
-    prev_.setTooltip("Previous preset");
-    next_.setTooltip("Next preset");
-    name_.setTooltip("Preset browser (Factory / User)");
-    menu_.setTooltip("Preset menu: Save, Save As, Rename, Delete, Duplicate, Import, Export");
-    slotA_.setTooltip("Compare: state A");
-    slotB_.setTooltip("Compare: state B");
+    prev_.setTooltip("Load the previous preset in the list.");
+    next_.setTooltip("Load the next preset in the list.");
+    name_.setTooltip("Preset browser: pick a factory or user preset.");
+    menu_.setTooltip("Preset menu: save, save as, rename, delete, duplicate, import and export.");
+    slotA_.setTooltip("A/B compare, slot A: click to switch to it. Each slot keeps its own settings.");
+    slotB_.setTooltip("A/B compare, slot B: click to switch to it. Each slot keeps its own settings.");
 
     slotA_.setClickingTogglesState(false);
     slotB_.setClickingTogglesState(false);

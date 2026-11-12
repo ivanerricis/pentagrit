@@ -16,8 +16,8 @@ CrossoverDisplay::CrossoverDisplay(juce::AudioProcessorValueTreeState& apvts, Me
     : apvts_(apvts), meters_(meters)
 {
     setTitle("Crossover display");
-    setTooltip("Crossover: drag the handles (log 20 Hz to 20 kHz, 1/3 octave minimum spacing), Ctrl+click or "
-               "double-click types a frequency, Ctrl+click resets");
+    setTooltip("Crossover: drag a handle to move it (20 Hz to 20 kHz, at least 1/3 octave apart). "
+               "Double-click a handle to type a frequency, Ctrl/Cmd+click to reset it.");
     for (size_t i = 0; i < 4; ++i)
     {
         auto* param = apvts.getParameter(pid::xover[i]);
@@ -205,6 +205,7 @@ void CrossoverDisplay::beginTyping(int h)
     typingHandle_ = h;
     editor_ = std::make_unique<juce::TextEditor>();
     editor_->setTitle("Crossover frequency (Hz)");
+    editor_->setTooltip("Type a frequency in Hz or e.g. 1.2k. Enter confirms, Esc cancels.");
     editor_->setJustification(juce::Justification::centred);
     editor_->setFont(fonts::mono(10.5f, fonts::Weight::regular));
     editor_->setIndents(0, 0);
