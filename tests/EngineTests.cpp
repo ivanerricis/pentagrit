@@ -648,6 +648,8 @@ TEST_CASE("Fuzz: random parameters every block never produce NaN, Inf or huge pe
         s.mix01 = uni(0.0f, 1.0f);
         s.autoGain = chance(0.5);
         s.bypass = chance(0.05);
+        s.deltaMonitor = chance(0.3);
+        s.levelMatchBypass = chance(0.5);
         if (chance(0.1))
         {
             s.os = kFactors[std::uniform_int_distribution<int>(0, 3)(gen)];
@@ -679,6 +681,7 @@ TEST_CASE("Fuzz: random parameters every block never produce NaN, Inf or huge pe
         }
         float* ptrs[2] = {l.data(), r.data()};
         juce::AudioBuffer<float> buf(ptrs, 2, block);
+        e->setNonRealtime(chance(0.1)); // offline blocks switch the level matching off
         e->setSettings(s);
         e->process(buf);
         for (int i = 0; i < block; ++i)
@@ -728,6 +731,8 @@ TEST_CASE("reset() clears every trace of the previous audio", "[engine][reset]")
                     }
                     if (variant == 1) // partial mixes, fewer bands, a bypassed and a muted band
                     {
+                        s.deltaMonitor = true;
+                        s.levelMatchBypass = true;
                         s.numBands = 4;
                         s.mix01 = 0.6f;
                         s.bands[0].mix01 = 0.5f;
@@ -810,7 +815,8 @@ TEST_CASE("reset() clears every trace of the previous audio", "[engine][reset]")
 
 TEST_CASE("reset() leaves the same state as a freshly prepared engine", "[engine][reset]")
 {
-    // Default settings only (no parameter change after prepare() that would start a fade), so a freshly
+    // Default settings plus the two monitoring flags (no parameter change after prepare() that would start a
+    // fade; the flags are set before the first setSettings(), which snaps them), so a freshly
     // prepared engine is a valid reference without calling reset() on it.
     const double sr = 48000.0;
     const Channels loud{noise(8191, 21, 0.9f), noise(8191, 22, 0.9f)};
@@ -827,6 +833,8 @@ TEST_CASE("reset() leaves the same state as a freshly prepared engine", "[engine
                     s.os = os;
                     s.osPhase = phase;
                     s.lookaheadMs = lookaheadMs;
+                    s.deltaMonitor = true;
+                    s.levelMatchBypass = true;
                     const Channels loudIn(loud.begin(), loud.begin() + numCh);
                     const Channels probeIn(probe.begin(), probe.begin() + numCh);
                     auto fresh = makeEngine(sr, 512, numCh, s);
@@ -1186,4 +1194,285 @@ TEST_CASE("Gain-change meters are 0/0 for a signal below the -70 dBFS gate", "[e
         CHECK(std::abs(maxOf(t.hi[b])) < 0.01f);
         CHECK(std::abs(minOf(t.lo[b])) < 0.01f);
     }
+}
+
+// ---- delta monitoring and level-matched bypass ------------------------------------------------------------
+
+namespace
+{
+EngineSettings shaped(OSFactor os, float lookaheadMs)
+{
+    auto s = neutral(os, 3);
+    s.lookaheadMs = lookaheadMs;
+    s.autoGain = true;
+    for (size_t b = 0; b < s.bands.size(); ++b)
+    {
+        s.bands[b].attackDb = 9.0f;
+        s.bands[b].sustainDb = -6.0f;
+        s.bands[b].gainDb = b == 0 ? 4.0f : -3.0f;
+        s.bands[b].sat = b == 1 ? SatType::tanh : SatType::off;
+        s.bands[b].driveDb = 12.0f;
+    }
+    return s;
+}
+
+double maxAbs(const Signal& x, size_t from = 0)
+{
+    double m = 0.0;
+    for (size_t i = from; i < x.size(); ++i)
+        m = std::max(m, static_cast<double>(std::abs(x[i])));
+    return m;
+}
+
+// Renders `seconds` of stationary noise at the given amplitude, one block at a time, and returns the output.
+Signal renderNoise(MultibandEngine& e, const EngineSettings& s, double sr, double seconds, float amp,
+                   unsigned seed)
+{
+    return renderMono(e, s, noise(static_cast<size_t>(seconds * sr), seed, amp), 480);
+}
+} // namespace
+
+TEST_CASE("Delta: normal output minus delta equals the mix 0 output", "[engine][delta]")
+{
+    const double sr = 48000.0;
+    const auto in = noise(static_cast<size_t>(sr), 61, 0.3f);
+    for (auto os : {OSFactor::x1, OSFactor::x2, OSFactor::x4})
+    {
+        for (float lookaheadMs : {0.0f, 2.0f})
+        {
+            auto s = shaped(os, lookaheadMs);
+            auto eNormal = makeEngine(sr, 512, 1, s);
+            const auto normal = renderMono(*eNormal, s, in);
+
+            auto sd = s;
+            sd.deltaMonitor = true;
+            auto eDelta = makeEngine(sr, 512, 1, sd);
+            const auto delta = renderMono(*eDelta, sd, in);
+
+            auto s0 = s;
+            s0.mix01 = 0.0f;
+            auto eDry = makeEngine(sr, 512, 1, s0);
+            const auto dry = renderMono(*eDry, s0, in);
+
+            Signal residual(in.size());
+            for (size_t i = 0; i < in.size(); ++i)
+                residual[i] = normal[i] - delta[i] - dry[i];
+            const size_t from = 4096;
+            const double err = toDb(rms(residual, from) / rms(dry, from));
+            INFO("x" << (1 << static_cast<int>(os)) << " lookahead " << lookaheadMs << " ms: " << err
+                     << " dB");
+            CHECK(err < -60.0);
+            CHECK(toDb(rms(delta, from)) > toDb(rms(dry, from)) - 30.0); // the delta is not silent
+        }
+    }
+}
+
+TEST_CASE("Delta of untouched bands at mix 0 is exact silence", "[engine][delta]")
+{
+    const double sr = 48000.0;
+    for (auto os : kFactors)
+    {
+        auto s = neutral(os, 4);
+        s.mix01 = 0.0f;
+        s.deltaMonitor = true;
+        auto e = makeEngine(sr, 512, 2, s);
+        const auto out = render(*e, s, Channels{noise(8000, 71, 0.5f), noise(8000, 72, 0.5f)}, 300);
+        for (const auto& ch : out)
+            for (float v : ch)
+                REQUIRE(v == 0.0f);
+    }
+}
+
+TEST_CASE("Toggling delta does not click", "[engine][delta]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    for (auto& b : s.bands)
+        b.gainDb = 6.0f; // wet is about twice the dry, so the delta is clearly different from the output
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto in = sine(static_cast<size_t>(sr) * 3 / 2, 440.0, sr, 0.4f);
+    const size_t third = in.size() / 3;
+    Signal out;
+    for (int part = 0; part < 3; ++part)
+    {
+        s.deltaMonitor = part == 1; // off, on, off
+        const Signal chunk(in.begin() + static_cast<std::ptrdiff_t>(static_cast<size_t>(part) * third),
+                           in.begin() + static_cast<std::ptrdiff_t>(static_cast<size_t>(part + 1) * third));
+        const auto o = renderMono(*e, s, chunk);
+        out.insert(out.end(), o.begin(), o.end());
+    }
+    for (size_t i = 1; i < out.size(); ++i)
+        REQUIRE(std::abs(out[i] - out[i - 1]) < 0.08f);
+    // Both modes were audible: the output alone is about +6 dB, the delta about the level of the dry.
+    const double normal = rms(out, third / 2, third);
+    const double delta = rms(out, third + third / 2, 2 * third);
+    const double dryRms = rms(in, third / 2, third);
+    CHECK(normal == Approx(2.0 * dryRms).epsilon(0.1));
+    CHECK(delta == Approx(dryRms).epsilon(0.1));
+}
+
+TEST_CASE("Bypass wins over delta", "[engine][delta]")
+{
+    auto s = neutral(OSFactor::x4);
+    s.deltaMonitor = true;
+    s.bypass = true;
+    auto e = makeEngine(48000.0, 256, 2, s);
+    const int latency = e->getLatencySamples();
+    const Channels in{noise(5000, 81), noise(5000, 82)};
+    const auto out = render(*e, s, in, 77);
+    for (size_t c = 0; c < 2; ++c)
+        for (size_t i = 0; i < in[c].size(); ++i)
+        {
+            const float expected =
+                i < static_cast<size_t>(latency) ? 0.0f : in[c][i - static_cast<size_t>(latency)];
+            REQUIRE(out[c][i] == expected);
+        }
+
+    // Bypassing while the delta is on gives the plain delayed input too (after the crossfade).
+    s.bypass = false;
+    auto e2 = makeEngine(48000.0, 256, 1, s);
+    const auto warmIn = noise(4000, 83);
+    const auto warm = renderMono(*e2, s, warmIn);
+    s.bypass = true;
+    const auto byp = noise(6000, 84, 0.5f);
+    const auto b = renderMono(*e2, s, byp);
+    const int latency2 = e2->getLatencySamples();
+    // Neutral bands: the delta is almost nothing (far below the input).
+    CHECK(toDb(rms(warm, 2000) / rms(warmIn, 2000)) < -50.0);
+    for (size_t i = static_cast<size_t>(latency2) + 2000; i < byp.size(); ++i)
+        REQUIRE(b[i] == byp[i - static_cast<size_t>(latency2)]);
+}
+
+TEST_CASE("Level matched bypass follows an output gain change", "[engine][levelmatch]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    s.outGainDb = 6.0f;
+    s.levelMatchBypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    const auto played = renderNoise(*e, s, sr, 12.0, 0.2f, 91);
+    const double playedRms = rms(played, played.size() - static_cast<size_t>(sr));
+    CHECK(e->meters().bypassMatchDb.load() == Approx(6.0f).margin(0.5f));
+
+    s.bypass = true;
+    const auto byp = renderNoise(*e, s, sr, 2.0, 0.2f, 92);
+    const double bypRms = rms(byp, byp.size() - static_cast<size_t>(sr));
+    INFO("played " << toDb(playedRms) << " dB, bypassed " << toDb(bypRms) << " dB");
+    CHECK(std::abs(toDb(bypRms) - toDb(playedRms)) < 0.5);
+
+    // The same bypass without the option is the plain (about 6 dB quieter) input.
+    auto plain = s;
+    plain.levelMatchBypass = false;
+    auto e2 = makeEngine(sr, 512, 1, plain);
+    const auto byp2 = renderNoise(*e2, plain, sr, 2.0, 0.2f, 92);
+    CHECK(toDb(playedRms) - toDb(rms(byp2, byp2.size() - static_cast<size_t>(sr))) > 5.0);
+}
+
+TEST_CASE("Level matched gain is frozen while bypassed", "[engine][levelmatch]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    s.outGainDb = 6.0f;
+    s.levelMatchBypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    renderNoise(*e, s, sr, 8.0, 0.2f, 101);
+    const float learned = e->meters().bypassMatchDb.load();
+    REQUIRE(learned == Approx(6.0f).margin(0.5f));
+
+    s.bypass = true;
+    for (float amp : {0.02f, 0.5f, 0.2f}) // the input level changes a lot while bypassed
+    {
+        const auto in = noise(static_cast<size_t>(4 * sr), 102, amp);
+        const auto out = renderMono(*e, s, in, 480);
+        CHECK(e->meters().bypassMatchDb.load() == learned);
+        // The bypassed signal keeps the learned gain.
+        const double g = rms(out, out.size() / 2) / rms(in, 0, in.size() / 2);
+        CHECK(toDb(g) == Approx(learned).margin(0.3));
+    }
+}
+
+TEST_CASE("Level match survives the bypass core reset but not reset()", "[engine][levelmatch][reset]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    s.outGainDb = 6.0f;
+    s.levelMatchBypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    renderNoise(*e, s, sr, 8.0, 0.2f, 111);
+    REQUIRE(e->meters().bypassMatchDb.load() == Approx(6.0f).margin(0.5f));
+
+    // A factor change rebuilds the core (resetCore) and so does a full bypass: the gain stays.
+    s.os = OSFactor::x4;
+    renderNoise(*e, s, sr, 0.5, 0.2f, 112);
+    CHECK(e->meters().bypassMatchDb.load() == Approx(6.0f).margin(0.5f));
+    s.bypass = true;
+    const auto in = noise(static_cast<size_t>(sr), 113, 0.2f);
+    const auto out = renderMono(*e, s, in, 480);
+    CHECK(toDb(rms(out, out.size() / 2) / rms(in, 0, in.size() / 2)) == Approx(6.0).margin(0.5));
+
+    // reset() forgets it: the bypass is the exact delayed input again and the readout is 0.
+    e->reset();
+    const int latency = e->getLatencySamples();
+    const auto out2 = renderMono(*e, s, in, 480);
+    CHECK(e->meters().bypassMatchDb.load() == 0.0f);
+    for (size_t i = static_cast<size_t>(latency); i < in.size(); ++i)
+        REQUIRE(out2[i] == in[i - static_cast<size_t>(latency)]);
+}
+
+TEST_CASE("Bypass stays bit exact when the level match is off, unlearned or offline", "[engine][levelmatch]")
+{
+    const double sr = 48000.0;
+    const auto in = noise(static_cast<size_t>(sr), 121, 0.2f);
+    auto checkExact = [&](MultibandEngine& e, const EngineSettings& s, bool nonRealtime)
+    {
+        const int latency = e.getLatencySamples();
+        const auto out = render(e, s, Channels{in}, 480, nonRealtime)[0];
+        // Skip the 20 ms crossfade when bypass was just engaged.
+        for (size_t i = static_cast<size_t>(latency) + 2000; i < in.size(); ++i)
+            REQUIRE(out[i] == in[i - static_cast<size_t>(latency)]);
+    };
+
+    { // on, nothing learned yet (0 dB)
+        auto s = neutral(OSFactor::x2);
+        s.levelMatchBypass = true;
+        s.bypass = true;
+        auto e = makeEngine(sr, 512, 1, s);
+        checkExact(*e, s, false);
+    }
+    { // learned, then the option is switched off
+        auto s = neutral(OSFactor::x2);
+        s.outGainDb = 6.0f;
+        s.levelMatchBypass = true;
+        auto e = makeEngine(sr, 512, 1, s);
+        renderNoise(*e, s, sr, 6.0, 0.2f, 122);
+        s.levelMatchBypass = false;
+        s.bypass = true;
+        checkExact(*e, s, false);
+        CHECK(e->meters().bypassMatchDb.load() == 0.0f);
+    }
+    { // learned in real time, then an offline render
+        auto s = neutral(OSFactor::x2);
+        s.outGainDb = 6.0f;
+        s.levelMatchBypass = true;
+        auto e = makeEngine(sr, 512, 1, s);
+        renderNoise(*e, s, sr, 6.0, 0.2f, 123);
+        s.bypass = true;
+        checkExact(*e, s, true);
+        CHECK(e->meters().bypassMatchDb.load() == 0.0f);
+    }
+}
+
+TEST_CASE("Level match ignores silence", "[engine][levelmatch]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    s.outGainDb = 6.0f;
+    s.levelMatchBypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    renderNoise(*e, s, sr, 6.0, 0.2f, 131);
+    const float learned = e->meters().bypassMatchDb.load();
+    renderMono(*e, s, Signal(static_cast<size_t>(10 * sr), 0.0f), 480); // 10 s of silence
+    CHECK(e->meters().bypassMatchDb.load() == Approx(learned).margin(0.05f));
+    renderNoise(*e, s, sr, 1.0, 0.0001f, 132); // -80 dBFS, below the gate
+    CHECK(e->meters().bypassMatchDb.load() == Approx(learned).margin(0.05f));
 }

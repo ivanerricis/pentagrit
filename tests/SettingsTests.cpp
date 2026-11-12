@@ -99,6 +99,7 @@ TEST_CASE("Settings defaults", "[settings]")
     CHECK(s.meterRelease == Catch::Approx(20.0f));
     CHECK(s.meterRefreshHz == 30);
     CHECK(s.showCpu);
+    CHECK_FALSE(s.levelMatchBypass); // opt-in monitoring aid
     CHECK(s.presetFolder.isEmpty());
     CHECK(s.startupMode == StartupMode::last);
     CHECK_FALSE(s.checkUpdates); // opt-in
@@ -141,6 +142,7 @@ TEST_CASE("Settings round trip", "[settings]")
         s.meterRelease = 35.0f;
         s.meterRefreshHz = 60;
         s.showCpu = false;
+        s.levelMatchBypass = true;
         s.presetFolder = absolutePathForTest();
         s.startupMode = StartupMode::specific;
         s.startup = {"Punchy Kick", "Drums", true};
@@ -163,6 +165,7 @@ TEST_CASE("Settings round trip", "[settings]")
     CHECK(s.meterRelease == Catch::Approx(35.0f));
     CHECK(s.meterRefreshHz == 60);
     CHECK_FALSE(s.showCpu);
+    CHECK(s.levelMatchBypass);
     CHECK(s.presetFolder == absolutePathForTest());
     CHECK(juce::File::isAbsolutePath(s.presetFolder));
     CHECK(s.startupMode == StartupMode::specific);
@@ -599,4 +602,54 @@ TEST_CASE("Value step is sanitised and the legacy double-click key is ignored", 
     s.valueStepDb = std::nanf("");
     m.set(s);
     CHECK(m.get().valueStepDb == 0.0f);
+}
+
+TEST_CASE("Level matched bypass option: reload, reset and mirroring into the processor",
+          "[settings][levelmatch]")
+{
+    // It is a per-user option, not a UI option: toUiOptions() does not carry it.
+    TempFile tmp;
+    SettingsManager m(tmp.file);
+    auto s = m.get();
+    s.levelMatchBypass = true;
+    m.set(s);
+    CHECK(m.get().levelMatchBypass);
+
+    // Another process changing the file is noticed.
+    {
+        SettingsManager other(tmp.file);
+        auto o = other.get();
+        o.levelMatchBypass = false;
+        other.set(o);
+    }
+    // The file time resolution can hide a very fast change; force it to differ.
+    tmp.file.setLastModificationTime(juce::Time::getCurrentTime() + juce::RelativeTime::seconds(5));
+    CHECK(m.reloadIfChanged());
+    CHECK_FALSE(m.get().levelMatchBypass);
+
+    s.levelMatchBypass = true;
+    m.set(s);
+    m.resetToDefaults();
+    CHECK_FALSE(m.get().levelMatchBypass);
+
+    // The processor mirrors the shared settings for the audio thread; delta is a session flag.
+    PentagritAudioProcessor proc;
+    auto& shared = proc.getSettings();
+    const auto original = shared.get();
+    CHECK_FALSE(proc.isLevelMatchBypass());
+    CHECK_FALSE(proc.isDeltaMonitoring());
+    auto on = original;
+    on.levelMatchBypass = true;
+    shared.set(on);
+    CHECK(proc.isLevelMatchBypass());
+    shared.set(original);
+    CHECK_FALSE(proc.isLevelMatchBypass());
+
+    proc.setDeltaMonitoring(true);
+    CHECK(proc.isDeltaMonitoring());
+    juce::MemoryBlock state;
+    proc.getStateInformation(state);
+    PentagritAudioProcessor other;
+    other.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+    CHECK_FALSE(other.isDeltaMonitoring()); // never saved in the project
 }

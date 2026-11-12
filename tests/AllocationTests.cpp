@@ -291,3 +291,70 @@ TEST_CASE("Changing the lookahead at runtime does not allocate", "[allocation]")
         }
     }
 }
+
+TEST_CASE("Delta monitoring and level matched bypass do not allocate", "[allocation]")
+{
+    MultibandEngine engine;
+    engine.prepare(48000.0, 512, 2);
+    EngineSettings s;
+    s.levelMatchBypass = true;
+    juce::AudioBuffer<float> buffer(2, 512);
+    std::mt19937 gen(11);
+    std::uniform_real_distribution<float> noise(-0.5f, 0.5f);
+
+    std::size_t total = 0;
+    for (int i = 0; i < 80; ++i)
+    {
+        for (int c = 0; c < 2; ++c)
+            for (int n = 0; n < 512; ++n)
+                buffer.setSample(c, n, noise(gen));
+        s.os = static_cast<OSFactor>((i / 8) % 4);
+        s.deltaMonitor = (i % 3) == 1;
+        s.bypass = (i % 11) >= 8;
+        s.outGainDb = (i % 2) == 0 ? 6.0f : -3.0f;
+        s.levelMatchBypass = (i % 13) != 12;
+        engine.setNonRealtime((i % 17) == 16);
+        {
+            ScopedCounter counter;
+            engine.setSettings(s);
+            engine.process(buffer);
+            total += ScopedCounter::count();
+        }
+    }
+    CHECK(total == 0);
+}
+
+TEST_CASE("processBlock does not allocate with delta monitoring and level matching on", "[allocation]")
+{
+    PentagritAudioProcessor proc;
+    auto& settings = proc.getSettings();
+    const auto original = settings.get();
+    auto on = original;
+    on.levelMatchBypass = true;
+    settings.set(on); // mirrored into the processor for the audio thread
+    REQUIRE(proc.isLevelMatchBypass());
+
+    proc.setPlayConfigDetails(2, 2, 48000.0, 512);
+    proc.prepareToPlay(48000.0, 512);
+    juce::AudioBuffer<float> buffer(2, 512);
+    juce::MidiBuffer midi;
+    std::mt19937 gen(13);
+    std::uniform_real_distribution<float> noise(-0.5f, 0.5f);
+
+    std::size_t total = 0;
+    for (int i = 0; i < 60; ++i)
+    {
+        for (int c = 0; c < 2; ++c)
+            for (int n = 0; n < 512; ++n)
+                buffer.setSample(c, n, noise(gen));
+        proc.setDeltaMonitoring((i % 4) >= 2);
+        setParam(proc, pid::bypass, (i % 10) >= 7 ? 1.0f : 0.0f);
+        {
+            ScopedCounter counter;
+            proc.processBlock(buffer, midi);
+            total += ScopedCounter::count();
+        }
+    }
+    settings.set(original);
+    CHECK(total == 0);
+}

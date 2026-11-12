@@ -44,6 +44,8 @@ struct UserSettings
     float meterRelease = 20.0f; // dB/s, 5..60
     int meterRefreshHz = 30;    // 30 / 60
     bool showCpu = true;
+    // Bypass is scaled to the learned level of the plugin output (live use only, never in offline renders).
+    bool levelMatchBypass = false;
     juce::String presetFolder; // empty = platform default (PresetManager::getDefaultUserFolder())
     StartupMode startupMode = StartupMode::last;
     PresetRef startup; // used when startupMode == specific

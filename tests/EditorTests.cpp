@@ -508,3 +508,82 @@ TEST_CASE("Gain-change meters stay readable at 5 bands in compact layout and eve
         }
     }
 }
+
+namespace
+{
+juce::Component* findByTitle(juce::Component& root, const juce::String& title)
+{
+    for (auto* child : root.getChildren())
+    {
+        if (child->getTitle() == title)
+        {
+            return child;
+        }
+        if (auto* found = findByTitle(*child, title))
+        {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+// What a mouse click does (Button::triggerClick is asynchronous): flip the state, then run onClick.
+void click(juce::ToggleButton& b)
+{
+    b.setToggleState(!b.getToggleState(), juce::dontSendNotification);
+    b.onClick();
+}
+} // namespace
+
+TEST_CASE("MONITOR row fits the master panel and its switches work", "[gui][Editor][delta][levelmatch]")
+{
+    PentagritAudioProcessor processor;
+    const auto original = processor.getSettings().get();
+    PentagritAudioProcessorEditor editor(processor);
+    for (auto layout : {ui::Layout::full, ui::Layout::compact})
+    {
+        ui::UiOptions o;
+        o.layout = layout;
+        editor.setUiOptions(o);
+        editor.refreshNow();
+
+        auto* delta = dynamic_cast<juce::ToggleButton*>(findByTitle(editor, "Delta monitoring"));
+        auto* match = dynamic_cast<juce::ToggleButton*>(findByTitle(editor, "Match bypass level"));
+        auto* drive = findByTitle(editor, "Drive compensation");
+        REQUIRE(delta != nullptr);
+        REQUIRE(match != nullptr);
+        REQUIRE(drive != nullptr);
+        CHECK(delta->getTooltip().isNotEmpty());
+        CHECK(match->getTooltip().isNotEmpty());
+
+        auto* panel = delta->getParentComponent();
+        REQUIRE(panel != nullptr);
+        const auto inside = panel->getLocalBounds();
+        INFO("layout " << (layout == ui::Layout::full ? "full" : "compact") << ", panel height "
+                       << panel->getHeight());
+        for (auto* c : {static_cast<juce::Component*>(delta), static_cast<juce::Component*>(match), drive})
+        {
+            CHECK(inside.contains(c->getBounds()));
+            CHECK(c->getHeight() >= 20);
+        }
+        CHECK_FALSE(delta->getBounds().intersects(match->getBounds()));
+        CHECK_FALSE(delta->getBounds().intersects(drive->getBounds()));
+        CHECK_FALSE(match->getBounds().intersects(drive->getBounds()));
+        // The switches drive the processor: delta is a session flag, the match option the shared settings.
+        CHECK_FALSE(processor.isDeltaMonitoring());
+        click(*delta);
+        CHECK(processor.isDeltaMonitoring());
+        editor.refreshNow();
+        CHECK(delta->getToggleState());
+        click(*delta);
+        CHECK_FALSE(processor.isDeltaMonitoring());
+
+        CHECK_FALSE(processor.isLevelMatchBypass());
+        click(*match);
+        CHECK(processor.isLevelMatchBypass());
+        CHECK(processor.getSettings().get().levelMatchBypass);
+        click(*match);
+        CHECK_FALSE(processor.isLevelMatchBypass());
+    }
+    processor.getSettings().set(original);
+}

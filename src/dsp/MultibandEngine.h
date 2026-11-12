@@ -5,6 +5,7 @@
 #include "dsp/BandProcessor.h"
 #include "dsp/Crossover.h"
 #include "dsp/DspTypes.h"
+#include "dsp/LevelMatch.h"
 #include "dsp/Meters.h"
 #include <array>
 #include <memory>
@@ -18,7 +19,8 @@ namespace pentagrit
 //
 // input -> [delay line for bypass] -> Oversampler.up -> (dry copy -> allpass chain) -> inGain -> crossover ->
 // bands -> sum -> AutoGain (ref = phase-matched dry taken before inGain) -> global mix with the phase-matched
-// dry -> Oversampler.down -> outGain -> bypass crossfade.
+// dry [-> delta: wet - dry] -> Oversampler.down -> outGain -> bypass crossfade (against the delayed input,
+// optionally level matched, see LevelMatch).
 //
 // Lookahead (EngineSettings::lookaheadMs): every band delays its audio by L base-rate samples (L * factor at
 // the processing rate) while its transient detector sees the undelayed signal; the phase-matched dry is
@@ -95,6 +97,9 @@ private:
     int dryDelayMask_ = 0, dryDelayPos_ = 0, dryDelay_ = 0;
     std::vector<float> ramp_;
 
-    Smoothed inGain_, mix_, outGain_, bypassW_;
+    LevelMatch levelMatch_;                         // cleared by reset(), kept by resetCore()
+    std::vector<const float*> matchOut_, matchRef_; // channel pointers handed to levelMatch_.analyse()
+
+    Smoothed inGain_, mix_, outGain_, bypassW_, deltaW_;
 };
 } // namespace pentagrit

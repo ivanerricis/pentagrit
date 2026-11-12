@@ -10,6 +10,7 @@ namespace
 {
 constexpr double kGainRampSec = 0.005;
 constexpr double kBypassRampSec = 0.020;
+constexpr double kDeltaRampSec = 0.020;
 constexpr double kMaxRate = 384000.0;
 
 using Block = juce::dsp::AudioBlock<float>;
@@ -185,6 +186,10 @@ void MultibandEngine::prepare(double sampleRate, int maxBlockSize, int numChanne
     bypassW_.reset(sampleRate_, kBypassRampSec);
     inGain_.reset(sampleRate_, kGainRampSec);
     mix_.reset(sampleRate_, kGainRampSec);
+    deltaW_.reset(sampleRate_, kDeltaRampSec);
+    levelMatch_.prepare(sampleRate_);
+    matchOut_.assign(static_cast<size_t>(numCh_), nullptr);
+    matchRef_.assign(static_cast<size_t>(numCh_), nullptr);
 
     prepared_ = true;
     configured_ = false;
@@ -205,6 +210,7 @@ void MultibandEngine::reset() noexcept
         return;
     }
     resetCore();
+    levelMatch_.reset(); // the learned bypass gain is history, unlike in resetCore()
     delayLine_.clear();
     delayPos_ = 0;
     needSnap_ = true;
@@ -279,6 +285,7 @@ void MultibandEngine::applyConfiguration() noexcept
         autoGain_.setProcessingRate(rate);
         inGain_.reset(rate, kGainRampSec);
         mix_.reset(rate, kGainRampSec);
+        deltaW_.reset(rate, kDeltaRampSec);
         resetCore();
     }
 
@@ -331,12 +338,14 @@ void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
     const float inG = dbToGain(settings_.inGainDb), outG = dbToGain(settings_.outGainDb);
     const float mixV = clampTo(settings_.mix01, 0.0f, 1.0f);
     const float byp = settings_.bypass ? 1.0f : 0.0f;
+    const float deltaV = settings_.deltaMonitor && !settings_.bypass ? 1.0f : 0.0f; // bypass wins
     if (needSnap_)
     {
         inGain_.setCurrentAndTargetValue(inG);
         outGain_.setCurrentAndTargetValue(outG);
         mix_.setCurrentAndTargetValue(mixV);
         bypassW_.setCurrentAndTargetValue(byp);
+        deltaW_.setCurrentAndTargetValue(deltaV);
         needSnap_ = false;
     }
     else
@@ -345,6 +354,7 @@ void MultibandEngine::setSettings(const EngineSettings& settings) noexcept
         outGain_.setTargetValue(outG);
         mix_.setTargetValue(mixV);
         bypassW_.setTargetValue(byp);
+        deltaW_.setTargetValue(deltaV);
     }
 
     for (size_t i = 0; i < 4; ++i)
@@ -429,6 +439,8 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
     }
     delayPos_ = (delayPos_ + n) & delayMask_;
 
+    // Level-matched bypass is a monitoring aid for live use only: offline renders keep the exact bypass.
+    const bool matchOn = settings_.levelMatchBypass && !nonRealtime_;
     const bool bypassFull = !bypassW_.isSmoothing() && bypassW_.getTargetValue() >= 1.0f;
     if (bypassFull)
     {
@@ -436,6 +448,11 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
         {
             resetCore();
             coreCold_ = true;
+        }
+        deltaW_.setCurrentAndTargetValue(deltaW_.getTargetValue()); // bypass wins: the delta is already off
+        if (matchOn)
+        {
+            levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n); // frozen gain
         }
         for (int ch = 0; ch < nc; ++ch)
         {
@@ -447,6 +464,7 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
             p.store(kSilenceDb, std::memory_order_relaxed);
         }
         storePeak(meters_.outPeakDb, gainToDb(peakOf(base)));
+        meters_.bypassMatchDb.store(matchOn ? levelMatch_.getTargetDb() : 0.0f, std::memory_order_relaxed);
         return;
     }
     coreCold_ = false;
@@ -506,12 +524,63 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
     autoGain_.process(juce::dsp::AudioBlock<const float>(dry), work);
     blendWithDry(mix_, ramp_, work, dry);
 
+    // Delta: keep only what the plugin changed, work -= w * dry (the same phase-matched, lookahead-delayed
+    // dry as the mix). Skipped while settled at 0.
+    const bool deltaActive = deltaW_.isSmoothing() || deltaW_.getTargetValue() > 0.0f;
+    if (deltaActive)
+    {
+        const bool smoothing = fillRamp(deltaW_, ramp_.data(), static_cast<int>(m));
+        const float w = deltaW_.getTargetValue();
+        for (int ch = 0; ch < nc; ++ch)
+        {
+            float* o = work.getChannelPointer(static_cast<size_t>(ch));
+            const float* d = dry.getChannelPointer(static_cast<size_t>(ch));
+            if (smoothing)
+            {
+                for (size_t i = 0; i < m; ++i)
+                {
+                    o[i] -= ramp_[i] * d[i];
+                }
+            }
+            else
+            {
+                for (size_t i = 0; i < m; ++i)
+                {
+                    o[i] -= w * d[i];
+                }
+            }
+        }
+    }
+
     if (os != nullptr)
     {
         os->processSamplesDown(base);
     }
 
     applyGain(outGain_, ramp_, base);
+
+    // Level-matched bypass: learn from the final output while bypass is settled off (and not in delta mode,
+    // where the output is only the residual), otherwise scale the delayed input by the learned gain.
+    if (matchOn)
+    {
+        if (!bypassW_.isSmoothing() && bypassW_.getTargetValue() <= 0.0f)
+        {
+            if (!deltaActive)
+            {
+                for (int ch = 0; ch < nc; ++ch)
+                {
+                    matchOut_[static_cast<size_t>(ch)] = base.getChannelPointer(static_cast<size_t>(ch));
+                    matchRef_[static_cast<size_t>(ch)] = delayed_.getReadPointer(ch);
+                }
+                levelMatch_.analyse(matchOut_.data(), matchRef_.data(), nc, n);
+            }
+            levelMatch_.advance(n);
+        }
+        else
+        {
+            levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n);
+        }
+    }
 
     // Bypass crossfade against the delayed dry: out = wet * (1 - w) + dry * w.
     {
@@ -541,6 +610,7 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
         }
     }
     storePeak(meters_.outPeakDb, gainToDb(peakOf(base)));
+    meters_.bypassMatchDb.store(matchOn ? levelMatch_.getTargetDb() : 0.0f, std::memory_order_relaxed);
 }
 
 int MultibandEngine::lookaheadSamples(float ms, double sampleRate) noexcept

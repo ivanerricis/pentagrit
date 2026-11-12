@@ -7,8 +7,8 @@ Source of truth for the frozen WP0 contracts. Parameter IDs are stable and must 
 ## DSP summary
 
 Signal flow:
-`input -> Oversampler.up -> inGain -> crossover LR4 (cascaded TPT SVF) -> per band [TransientShaper -> Saturator -> dry/wet mix -> gain x mute/solo] -> sum -> AutoGain -> global mix with phase-matched dry (allpass chain) -> Oversampler.down -> outGain`.
-Bypass is a delay of L samples with a 20 ms crossfade.
+`input -> Oversampler.up -> inGain -> crossover LR4 (cascaded TPT SVF) -> per band [TransientShaper -> Saturator -> dry/wet mix -> gain x mute/solo] -> sum -> AutoGain -> global mix with phase-matched dry (allpass chain) -> [delta: - dry] -> Oversampler.down -> outGain`.
+Bypass is a delay of L samples with a 20 ms crossfade, optionally scaled to the learned output level (see Monitoring). Delta (`[delta: - dry]`) is off by default.
 
 - One oversampler around the whole core (same latency for every band); equiripple half-band FIR (linear phase) or polyphase IIR (minimum phase), integer latency; factor limited to fs * F <= 384 kHz.
 - Latency reported to the host = oversampler latency + transient-shaper lookahead (0 when the lookahead is Off).
@@ -21,6 +21,14 @@ Bypass is a delay of L samples with a 20 ms crossfade.
   - Drive compensation (`driveComp`, global, default off): the output is scaled by `1 / driveGain`, the same smoothed gain as the pre-gain, so a signal below the knee keeps the level it has at 0 dB drive and only the harmonics change. The Off curve is never compensated. The switch is blended with a ~20 ms ramp. The small-signal slope of each curve at 0 dB drive is not removed. With compensation off and settled the extra code is skipped.
 - AutoGain: wet RMS vs dry reference (400 ms), clamp +-24 dB, 200 ms smoothing, hold on silence.
 - Realtime safe: no allocation/locks in the audio thread, `ScopedNoDenormals`, parameters through `std::atomic<float>*`, atomic meters.
+
+## Monitoring (delta and level-matched bypass)
+
+Two listening aids with no parameters (65 parameters, `stateVersion` 1 unchanged). Both reach the engine through `EngineSettings` (`deltaMonitor`, `levelMatchBypass`), filled by `PentagritAudioProcessor::engineSettings()` right after `params_.snapshot()` from two atomics, so the audio thread never touches the settings object.
+
+- **Delta** (`setDeltaMonitoring` / `isDeltaMonitoring`): a session flag of the instance. It is never saved in the project or in presets and is off when the plugin loads. Right after the global mix the engine computes `work -= w * dry`, with the same phase-matched, lookahead-delayed `dry` that the mix and the auto-gain use, so the output is exactly what the plugin added or removed (normal output minus delta equals the mix 0 output). `w` is a 20 ms smoothed 0..1 value (no click when toggling); while it is settled at 0 the code is skipped. `outGain` is applied afterwards. Bypass wins: the engine target is `delta && !bypass`, and in a full bypass the smoother is snapped to 0. With mix 0, or untouched bands at mix 0, the result is exact silence.
+- **Level-matched bypass**: the per-user option `levelMatchBypass` (`SettingsManager`, default off, never in the project) is mirrored into a processor atomic when the settings change. The engine honours it only while rendering in real time (`!isNonRealtime()`); offline renders keep the exact bypass. `LevelMatch` (`src/dsp/LevelMatch.*`) holds two one-pole mean-square trackers (about 2 s), one on the final output (after `outGain`, before the bypass crossfade) and one on the delayed input `delayed_`. They are updated per block only while the bypass is settled at 0, delta is off and both blocks are above -60 dBFS RMS. The gain is `sqrt(out / in)`, clamped to +-24 dB, frozen while the bypass target is 1, and smoothed over 50 ms. It multiplies `delayed_` in the crossfade and in the full-bypass copy; `MeterState::bypassMatchDb` holds the value for the readout (0 when inactive). `reset()` clears it, `resetCore()` (factor changes, entering a full bypass) keeps it. With the option off or inactive the exact original copy path runs, so bypass stays bit exact (the gain of an unlearned match is exactly 1 as well).
+- UI: the MONITOR row of the master panel (under Drive Comp) has the "Delta" and "Match bypass" toggles and the match readout; the output meter is tinted and captioned "DELTA" while delta is on.
 
 ## Parameters (65)
 
@@ -92,12 +100,13 @@ struct BandSettings { float gainDb=0, attackDb=0, sustainDb=0, speed01=.5f, driv
 struct EngineSettings { float inGainDb=0, outGainDb=0, mix01=1; bool autoGain=false, bypass=false, driveComp=false;
   OSFactor os=OSFactor::x2; OSPhase osPhase=OSPhase::linear; OSFactor osRender=OSFactor::x1; bool osRenderSame=true;
   int numBands=3; std::array<float,4> xoverHz{120,1200,3500,8000};
-  std::array<BandSettings,kMaxBands> bands{}; /* + lookahead, see the header */ };
+  std::array<BandSettings,kMaxBands> bands{}; /* + lookahead, deltaMonitor, levelMatchBypass, see the header */ };
 // dsp/Meters.h  (audio thread writes relaxed, UI reads)
 struct MeterState { std::array<std::atomic<float>,kMaxBands> bandPeakDb, bandTransientGainDb,
   bandTransientGainMinDb, bandTransientGainMaxDb; /* dB range of the transient gain over the last host block, 0/0 when idle */
   std::atomic<float> inPeakDb{-100}, outPeakDb{-100}, autoGainDb{0};
   std::array<std::atomic<float>,4> effectiveXoverHz; std::atomic<int> latencySamples{0};
+  std::atomic<float> bypassMatchDb{0.f}; /* level-matched bypass gain, 0 = inactive */
   std::atomic<float> cpuLoad{0.f}; /* fraction 0..1 of block time in processBlock */ };
 ```
 
