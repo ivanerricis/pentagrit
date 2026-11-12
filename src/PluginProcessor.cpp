@@ -152,6 +152,7 @@ PentagritAudioProcessor::PentagritAudioProcessor()
     }
     SettingsManager::applyStartupPreset(s, presetManager_);
 
+    levelMatchBypass_.store(s.levelMatchBypass, std::memory_order_relaxed);
     settings_->addChangeListener(this);
     presetManager_.addChangeListener(this);
     startTimerHz(30);
@@ -191,6 +192,7 @@ void PentagritAudioProcessor::changeListenerCallback(juce::ChangeBroadcaster* so
     }
     else if (source == &*settings_)
     {
+        levelMatchBypass_.store(settings_->get().levelMatchBypass, std::memory_order_relaxed);
         const auto folder = settings_->getEffectivePresetFolder();
         if (folder != presetManager_.getUserFolder())
         {
@@ -209,7 +211,7 @@ void PentagritAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     currentSampleRate_ = sampleRate;
     engine_.setNonRealtime(isNonRealtime());
     engine_.prepare(sampleRate, samplesPerBlock, juce::jmax(1, getTotalNumOutputChannels()));
-    engine_.setSettings(params_.snapshot());
+    engine_.setSettings(engineSettings());
     pendingLatency_.store(engine_.getLatencySamples(), std::memory_order_relaxed);
     setLatencySamples(engine_.getLatencySamples());
 }
@@ -228,6 +230,14 @@ void PentagritAudioProcessor::timerCallback()
 }
 
 void PentagritAudioProcessor::releaseResources() {}
+
+EngineSettings PentagritAudioProcessor::engineSettings() const noexcept
+{
+    auto s = params_.snapshot();
+    s.deltaMonitor = deltaMonitoring_.load(std::memory_order_relaxed);
+    s.levelMatchBypass = levelMatchBypass_.load(std::memory_order_relaxed);
+    return s;
+}
 
 bool PentagritAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
@@ -252,7 +262,7 @@ void PentagritAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     // band count change reconfigures the engine and changes the latency, which the message-thread timer
     // reports.
     engine_.setNonRealtime(isNonRealtime());
-    engine_.setSettings(params_.snapshot());
+    engine_.setSettings(engineSettings());
     engine_.process(buffer);
 
     pendingLatency_.store(engine_.getLatencySamples(), std::memory_order_relaxed);

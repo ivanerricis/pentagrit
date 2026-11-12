@@ -41,6 +41,7 @@ struct MeterState
     std::atomic<float> inPeakDb{-100}, outPeakDb{-100}, autoGainDb{0};
     std::array<std::atomic<float>, 4> effectiveXoverHz;
     std::atomic<int> latencySamples{0};
-    std::atomic<float> cpuLoad{0.0f}; // fraction 0..1 of block time spent in processBlock
+    std::atomic<float> bypassMatchDb{0.0f}; // level-matched bypass gain in dB (0 when inactive)
+    std::atomic<float> cpuLoad{0.0f};       // fraction 0..1 of block time spent in processBlock
 };
 } // namespace pentagrit

@@ -55,6 +55,15 @@ public:
     // Per-user settings, shared by all instances of the process.
     SettingsManager& getSettings() noexcept { return *settings_; }
 
+    // Delta monitoring: the output is only what the plugin changed (wet minus the phase-matched dry). A
+    // session flag of this instance: never saved in the project or in presets, off when the plugin loads.
+    // Bypass wins. Thread safe.
+    void setDeltaMonitoring(bool on) noexcept { deltaMonitoring_.store(on, std::memory_order_relaxed); }
+    bool isDeltaMonitoring() const noexcept { return deltaMonitoring_.load(std::memory_order_relaxed); }
+    // True when the per-user option "level matched bypass" is on (mirror of the settings, safe to read from
+    // any thread). The engine only applies it while rendering in real time.
+    bool isLevelMatchBypass() const noexcept { return levelMatchBypass_.load(std::memory_order_relaxed); }
+
     // Undo history of the changes made from the plugin UI (MESSAGE THREAD ONLY; the audio thread never
     // touches it). One transaction per UI gesture: a knob drag, a typed value, a toggle click, a crossover
     // handle drag or a selector change (with the crossover handles it moves). Host automation is not
@@ -89,6 +98,8 @@ private:
     void timerCallback() override;
     // Single place for state migrations; called with the version found in the saved state.
     static void migrateState(juce::ValueTree& state, int fromVersion);
+    // Parameter snapshot plus the session / per-user monitoring flags (audio thread safe).
+    EngineSettings engineSettings() const noexcept;
 
     class UndoRecorder;
 
@@ -101,6 +112,8 @@ private:
     double currentSampleRate_ = 0.0;
     std::atomic<int> pendingLatency_{0};
     std::atomic<bool> pendingUndoClear_{false};
+    std::atomic<bool> deltaMonitoring_{false};
+    std::atomic<bool> levelMatchBypass_{false};  // mirror of UserSettings::levelMatchBypass
     int undoPause_ = 0;                          // message thread
     std::unique_ptr<UndoRecorder> undoRecorder_; // last: destroyed first
 

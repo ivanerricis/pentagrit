@@ -33,6 +33,7 @@ constexpr const char* kMeterHold = "meterHold";
 constexpr const char* kMeterRelease = "meterRelease";
 constexpr const char* kMeterRefresh = "meterRefresh";
 constexpr const char* kShowCpu = "showCpu";
+constexpr const char* kLevelMatchBypass = "levelMatchBypass";
 constexpr const char* kPresetFolder = "presetFolder";
 constexpr const char* kStartupMode = "startupMode";
 constexpr const char* kStartupName = "startupName";
@@ -182,6 +183,7 @@ void SettingsManager::readFromProperties()
     s.meterRelease = static_cast<float>(p.getDoubleValue(kMeterRelease, s.meterRelease));
     s.meterRefreshHz = p.getIntValue(kMeterRefresh, s.meterRefreshHz);
     s.showCpu = p.getBoolValue(kShowCpu, s.showCpu);
+    s.levelMatchBypass = p.getBoolValue(kLevelMatchBypass, s.levelMatchBypass);
     s.presetFolder = p.getValue(kPresetFolder, {});
     const auto mode = p.getValue(kStartupMode, "last");
     s.startupMode = mode == "init"       ? StartupMode::init
@@ -211,6 +213,7 @@ void SettingsManager::writeToProperties()
     p.setValue(kMeterRelease, static_cast<double>(s.meterRelease));
     p.setValue(kMeterRefresh, s.meterRefreshHz);
     p.setValue(kShowCpu, s.showCpu);
+    p.setValue(kLevelMatchBypass, s.levelMatchBypass);
     p.setValue(kPresetFolder, s.presetFolder);
     p.setValue(kStartupMode, s.startupMode == StartupMode::init       ? "init"
                              : s.startupMode == StartupMode::specific ? "specific"
@@ -314,15 +317,15 @@ bool SettingsManager::reloadIfChanged()
     const auto before = data_;
     props_->reload();
     readFromProperties();
-    const bool differs = before.zoomPercent != data_.zoomPercent || before.style != data_.style ||
-                         before.layout != data_.layout || before.tooltips != data_.tooltips ||
-                         before.valueStepDb != data_.valueStepDb || before.knobMode != data_.knobMode ||
-                         before.sensitivity != data_.sensitivity || before.meterHoldMs != data_.meterHoldMs ||
-                         before.meterRelease != data_.meterRelease ||
-                         before.meterRefreshHz != data_.meterRefreshHz || before.showCpu != data_.showCpu ||
-                         before.presetFolder != data_.presetFolder ||
-                         before.startupMode != data_.startupMode || !(before.startup == data_.startup) ||
-                         before.checkUpdates != data_.checkUpdates;
+    const bool differs =
+        before.zoomPercent != data_.zoomPercent || before.style != data_.style ||
+        before.layout != data_.layout || before.tooltips != data_.tooltips ||
+        before.valueStepDb != data_.valueStepDb || before.knobMode != data_.knobMode ||
+        before.sensitivity != data_.sensitivity || before.meterHoldMs != data_.meterHoldMs ||
+        before.meterRelease != data_.meterRelease || before.meterRefreshHz != data_.meterRefreshHz ||
+        before.showCpu != data_.showCpu || before.levelMatchBypass != data_.levelMatchBypass ||
+        before.presetFolder != data_.presetFolder || before.startupMode != data_.startupMode ||
+        !(before.startup == data_.startup) || before.checkUpdates != data_.checkUpdates;
     if (differs)
     {
         sendSynchronousChangeMessage();

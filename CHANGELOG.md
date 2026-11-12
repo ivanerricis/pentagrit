@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Per-band gain-change meters: the indicator at the top of every band strip is now a bipolar meter of the transient shaper's gain (+-24 dB) that reacts instantly to the largest boost and cut of each audio block, falls back to 0 dB at the meter release speed and keeps hold markers (meter hold time) for the largest boost and cut; the readout shows the held extreme.
 - Band link: a link toggle in each band header. Moving a knob of a linked band moves the same knob of the other linked bands by the same amount (the saturation type is copied); mute, solo and bypass are never linked. The whole edit is one undo step, and the link choice is saved with the project and is not part of presets.
 
+
+- Delta monitoring: a "Delta" switch in the new MONITOR row of the master panel plays only what the plugin changes (the processed signal minus the phase-matched dry), with a "DELTA" tint on the output meter. It is a session switch (not saved in projects or presets, off when the plugin loads) and bypass wins.
+- Level-matched bypass: the "Match bypass" switch scales the bypassed signal to the loudness the plugin output had, so A/B compares tone and not volume. It is a per-user option (off by default), works in live playback only (offline renders keep the exact bypass) and shows the applied gain next to the switch.
 ### Changed
 
 - CI runs clap-validator on Windows, Linux and macOS and a failure now fails the build (it was advisory). The download script extracts the nested Linux and macOS archives and verifies a pinned SHA-256, and the validator output is uploaded with the validation logs.

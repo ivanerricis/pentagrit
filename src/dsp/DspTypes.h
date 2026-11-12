@@ -42,6 +42,11 @@ struct EngineSettings
     float inGainDb = 0, outGainDb = 0, mix01 = 1;
     bool autoGain = false, bypass = false;
     bool driveComp = false; // saturator drive compensation (global)
+    // Monitoring (session flags, not parameters). deltaMonitor outputs only what the plugin changed (wet
+    // minus the phase-matched dry); bypass wins. levelMatchBypass scales the bypassed signal to the learned
+    // output level; it is ignored in offline rendering so that bypass stays bit exact there.
+    bool deltaMonitor = false;
+    bool levelMatchBypass = false;
     OSFactor os = OSFactor::x2;
     OSPhase osPhase = OSPhase::linear;
     // Offline-render oversampling: if osRenderSame, the live factor `os` is used; else `osRender`.

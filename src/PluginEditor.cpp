@@ -34,8 +34,7 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
     : AudioProcessorEditor(&processor), processor_(processor),
       topBar_(processor.getAPVTS(), processor.getMeters(),
               [&processor] { return processor.getSampleRate(); }),
-      crossover_(processor.getAPVTS(), processor.getMeters()),
-      global_(processor.getAPVTS(), processor.getMeters())
+      crossover_(processor.getAPVTS(), processor.getMeters()), global_(processor)
 {
     auto& apvts = processor_.getAPVTS();
     setTitle("Pentagrit");
