@@ -87,6 +87,76 @@ TEST_CASE("Perf: engine per oversampling factor (5 bands, stereo, 48 kHz, block 
     }
 }
 
+TEST_CASE("Perf: cost of the lookahead (5 bands, stereo, 48 kHz, block 512)", "[.perf]")
+{
+    const double sr = 48000.0;
+    const int block = 512;
+    const int numBlocks = static_cast<int>(sr * 5 / block); // ~5 s of audio per repetition
+    const int reps = 7;
+    for (auto f : {OSFactor::x1, OSFactor::x2})
+    {
+        EngineSettings s;
+        s.os = f;
+        s.numBands = 5;
+        s.autoGain = true;
+        for (auto& b : s.bands)
+        {
+            b.sat = SatType::tube;
+            b.attackDb = 6.0f;
+            b.sustainDb = -3.0f;
+        }
+        juce::AudioBuffer<float> in(2, block), buf(2, block);
+        fillNoise(in, 0.3f, 1);
+        const auto run = [&](MultibandEngine& e)
+        {
+            for (int i = 0; i < numBlocks; ++i)
+            {
+                for (int c = 0; c < 2; ++c)
+                {
+                    buf.copyFrom(c, 0, in, c, 0, block);
+                }
+                e.setSettings(s);
+                e.process(buf);
+            }
+        };
+
+        // Both engines stay warm and the repetitions alternate, so drift in clock speed hits both equally.
+        auto off = s;
+        off.lookaheadMs = 0.0f;
+        auto on = s;
+        on.lookaheadMs = 5.0f;
+        MultibandEngine eOff, eOn;
+        eOff.prepare(sr, block, 2);
+        eOff.setSettings(off);
+        eOn.prepare(sr, block, 2);
+        eOn.setSettings(on);
+        run(eOff);
+        run(eOn);
+        double bestOff = std::numeric_limits<double>::max(), bestOn = bestOff;
+        for (int r = 0; r < reps; ++r)
+        {
+            bestOff = std::min(bestOff, minSeconds(1,
+                                                   [&]
+                                                   {
+                                                       s = off;
+                                                       run(eOff);
+                                                   }));
+            bestOn = std::min(bestOn, minSeconds(1,
+                                                 [&]
+                                                 {
+                                                     s = on;
+                                                     run(eOn);
+                                                 }));
+        }
+        const double frames = static_cast<double>(numBlocks) * block;
+        const double audioSec = frames / sr;
+        std::printf("PERF lookahead x%d: Off %.1f ns/frame (%.0fx realtime), 5 ms %.1f ns/frame (%.0fx "
+                    "realtime), overhead %+.1f %%\n",
+                    1 << static_cast<int>(f), 1.0e9 * bestOff / frames, audioSec / bestOff,
+                    1.0e9 * bestOn / frames, audioSec / bestOn, 100.0 * (bestOn / bestOff - 1.0));
+    }
+}
+
 TEST_CASE("Perf: modules at 384 kHz (block 4096, stereo)", "[.perf]")
 {
     const double rate = 384000.0;

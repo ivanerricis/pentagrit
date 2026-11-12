@@ -692,3 +692,365 @@ TEST_CASE("Fuzz: random parameters every block never produce NaN, Inf or huge pe
     INFO("worst peak " << worst);
     CHECK(worst < 1000.0f); // +60 dBFS
 }
+
+TEST_CASE("reset() clears every trace of the previous audio", "[engine][reset]")
+{
+    const double sr = 48000.0;
+    const Channels loudAll{noise(8191, 21, 0.9f), noise(8191, 22, 0.9f)};
+    const Channels silenceAll{Signal(2048, 0.0f), Signal(2048, 0.0f)};
+    const Channels probeAll{noise(4096, 23, 0.3f), noise(4096, 24, 0.3f)};
+
+    for (int variant = 0; variant < 4; ++variant)
+    {
+        // Variant 3 is mono; the others are stereo.
+        const size_t numCh = variant == 3 ? 1 : 2;
+        const Channels loud(loudAll.begin(), loudAll.begin() + static_cast<std::ptrdiff_t>(numCh));
+        const Channels silence(silenceAll.begin(), silenceAll.begin() + static_cast<std::ptrdiff_t>(numCh));
+        const Channels probe(probeAll.begin(), probeAll.begin() + static_cast<std::ptrdiff_t>(numCh));
+        for (auto os : kFactors)
+        {
+            for (auto phase : {OSPhase::linear, OSPhase::minimum})
+            {
+                for (float lookaheadMs : {0.0f, 5.0f})
+                {
+                    EngineSettings s;
+                    s.os = os;
+                    s.osPhase = phase;
+                    s.lookaheadMs = lookaheadMs;
+                    s.autoGain = true;
+                    s.driveComp = true;
+                    for (size_t b = 0; b < s.bands.size(); ++b)
+                    {
+                        s.bands[b].attackDb = 9.0f;
+                        s.bands[b].sustainDb = -6.0f;
+                        s.bands[b].sat = static_cast<SatType>((b + 1) % 6);
+                        s.bands[b].driveDb = 12.0f;
+                    }
+                    if (variant == 1) // partial mixes, fewer bands, a bypassed and a muted band
+                    {
+                        s.numBands = 4;
+                        s.mix01 = 0.6f;
+                        s.bands[0].mix01 = 0.5f;
+                        s.bands[1].bypass = true;
+                        s.bands[2].mute = true;
+                        s.inGainDb = 6.0f;
+                        s.outGainDb = -3.0f;
+                    }
+                    else if (variant == 2) // no auto-gain, no compensation, no saturation
+                    {
+                        s.autoGain = false;
+                        s.driveComp = false;
+                        for (auto& band : s.bands)
+                        {
+                            band.sat = SatType::off;
+                        }
+                    }
+                    const int block = variant == 1 ? 480 : 512;
+
+                    auto e = makeEngine(sr, 512, static_cast<int>(numCh), s);
+                    render(*e, s, loud, block);
+                    e->reset();
+                    const auto quiet = render(*e, s, silence, block);
+                    long firstIdx = -1;
+                    float firstVal = 0.0f;
+                    for (const auto& ch : quiet)
+                    {
+                        for (size_t i = 0; i < ch.size(); ++i)
+                        {
+                            if (ch[i] != 0.0f && (firstIdx < 0 || static_cast<long>(i) < firstIdx))
+                            {
+                                firstIdx = static_cast<long>(i);
+                                firstVal = ch[i];
+                            }
+                        }
+                    }
+                    INFO("variant " << variant << " x" << (1 << static_cast<int>(os))
+                                    << (phase == OSPhase::linear ? " linear" : " minimum") << " lookahead "
+                                    << lookaheadMs << " ms: first non-zero sample after reset at index "
+                                    << firstIdx << " = " << firstVal);
+                    CHECK(firstIdx < 0);
+
+                    // The audio that follows is bit-identical to what an engine that never saw the loud
+                    // signal produces from the same (reset) state. The reference is reset as well so that the
+                    // one-off fades of the very first parameter change after prepare() do not count as
+                    // history.
+                    auto fresh = makeEngine(sr, 512, static_cast<int>(numCh), s);
+                    fresh->reset();
+                    const auto expected = render(*fresh, s, probe, block);
+                    e->reset();
+                    render(*e, s, loud, block);
+                    e->reset();
+                    const auto fromReset = render(*e, s, probe, block);
+                    long firstDiff = -1;
+                    double maxDiff = 0.0;
+                    for (size_t c = 0; c < expected.size(); ++c)
+                    {
+                        for (size_t i = 0; i < expected[c].size(); ++i)
+                        {
+                            const double d = std::abs(static_cast<double>(fromReset[c][i]) -
+                                                      static_cast<double>(expected[c][i]));
+                            if (d > 0.0 && firstDiff < 0)
+                            {
+                                firstDiff = static_cast<long>(i);
+                            }
+                            maxDiff = std::max(maxDiff, d);
+                        }
+                    }
+                    INFO("variant " << variant << " x" << (1 << static_cast<int>(os))
+                                    << (phase == OSPhase::linear ? " linear" : " minimum") << " lookahead "
+                                    << lookaheadMs
+                                    << " ms: first difference to a reset fresh engine at index " << firstDiff
+                                    << ", max " << maxDiff);
+                    CHECK(firstDiff < 0);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("reset() leaves the same state as a freshly prepared engine", "[engine][reset]")
+{
+    // Default settings only (no parameter change after prepare() that would start a fade), so a freshly
+    // prepared engine is a valid reference without calling reset() on it.
+    const double sr = 48000.0;
+    const Channels loud{noise(8191, 21, 0.9f), noise(8191, 22, 0.9f)};
+    const Channels probe{noise(4096, 23, 0.3f), noise(4096, 24, 0.3f)};
+    for (int numCh : {1, 2})
+    {
+        for (auto os : kFactors)
+        {
+            for (auto phase : {OSPhase::linear, OSPhase::minimum})
+            {
+                for (float lookaheadMs : {0.0f, 5.0f})
+                {
+                    EngineSettings s;
+                    s.os = os;
+                    s.osPhase = phase;
+                    s.lookaheadMs = lookaheadMs;
+                    const Channels loudIn(loud.begin(), loud.begin() + numCh);
+                    const Channels probeIn(probe.begin(), probe.begin() + numCh);
+                    auto fresh = makeEngine(sr, 512, numCh, s);
+                    const auto expected = render(*fresh, s, probeIn, 512);
+                    auto e = makeEngine(sr, 512, numCh, s);
+                    render(*e, s, loudIn, 512);
+                    e->reset();
+                    const auto out = render(*e, s, probeIn, 512);
+                    long firstDiff = -1;
+                    double maxDiff = 0.0;
+                    for (size_t c = 0; c < expected.size(); ++c)
+                    {
+                        for (size_t i = 0; i < expected[c].size(); ++i)
+                        {
+                            const double d = std::abs(static_cast<double>(out[c][i]) -
+                                                      static_cast<double>(expected[c][i]));
+                            if (d > 0.0 && firstDiff < 0)
+                            {
+                                firstDiff = static_cast<long>(i);
+                            }
+                            maxDiff = std::max(maxDiff, d);
+                        }
+                    }
+                    INFO(numCh << " ch, x" << (1 << static_cast<int>(os))
+                               << (phase == OSPhase::linear ? " linear" : " minimum") << " lookahead "
+                               << lookaheadMs << " ms: first difference at index " << firstDiff << ", max "
+                               << maxDiff);
+                    CHECK(firstDiff < 0);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("reset() after runtime reconfiguration and bypass leaves nothing behind", "[engine][reset]")
+{
+    const double sr = 48000.0;
+    const Channels loud{noise(6000, 61, 0.9f), noise(6000, 62, 0.9f)};
+    const Channels silence{Signal(4096, 0.0f), Signal(4096, 0.0f)};
+    const Channels probe{noise(4096, 63, 0.3f), noise(4096, 64, 0.3f)};
+
+    EngineSettings s;
+    s.os = OSFactor::x2;
+    s.autoGain = true;
+    s.lookaheadMs = 2.0f;
+    for (auto& b : s.bands)
+    {
+        b.attackDb = 6.0f;
+        b.sat = SatType::tube;
+        b.driveDb = 9.0f;
+    }
+    auto e = makeEngine(sr, 512, 2, s);
+    render(*e, s, loud, 500);
+    for (auto os : {OSFactor::x4, OSFactor::x2, OSFactor::x8, OSFactor::x2})
+    {
+        s.os = os;
+        s.osPhase = os == OSFactor::x8 ? OSPhase::minimum : OSPhase::linear;
+        s.numBands = 2 + static_cast<int>(os) % 4;
+        render(*e, s, loud, 500);
+    }
+    s.bypass = true;
+    render(*e, s, loud, 500);
+    s.bypass = false;
+    render(*e, s, loud, 500); // leaving bypass crossfades against the delayed input
+    e->reset();
+    const auto quiet = render(*e, s, silence, 500);
+    for (const auto& ch : quiet)
+    {
+        for (size_t i = 0; i < ch.size(); ++i)
+        {
+            if (ch[i] != 0.0f)
+            {
+                FAIL("non-zero sample after reset at index " << i << ": " << ch[i]);
+            }
+        }
+    }
+
+    auto fresh = makeEngine(sr, 512, 2, s);
+    fresh->reset();
+    const auto expected = render(*fresh, s, probe, 500);
+    e->reset();
+    render(*e, s, loud, 500);
+    e->reset();
+    CHECK(render(*e, s, probe, 500) == expected);
+}
+
+namespace
+{
+EngineSettings autoGainSettings(OSFactor os, float lookaheadMs, float bandGainDb)
+{
+    EngineSettings s;
+    s.os = os;
+    s.lookaheadMs = lookaheadMs;
+    s.autoGain = true;
+    for (auto& b : s.bands)
+    {
+        b.gainDb = bandGainDb;
+    }
+    return s;
+}
+
+// Host-block loop that records the auto-gain meter after every block; `x` is processed in place.
+std::vector<float> renderWithMeter(MultibandEngine& e, const EngineSettings& s, Signal& x, int block)
+{
+    std::vector<float> meterDb;
+    for (size_t pos = 0; pos < x.size(); pos += static_cast<size_t>(block))
+    {
+        float* ptr = x.data() + pos;
+        const int len = static_cast<int>(std::min<size_t>(static_cast<size_t>(block), x.size() - pos));
+        juce::AudioBuffer<float> buf(&ptr, 1, len);
+        e.setSettings(s);
+        e.process(buf);
+        meterDb.push_back(e.meters().autoGainDb.load());
+    }
+    return meterDb;
+}
+} // namespace
+
+TEST_CASE("AutoGain restores the level of the unprocessed path with oversampling and lookahead",
+          "[engine][autogain]")
+{
+    const double sr = 48000.0;
+    const size_t n = static_cast<size_t>(sr) * 8;
+    const auto in = noise(n, 31, 0.2f);
+    for (auto os : {OSFactor::x1, OSFactor::x2, OSFactor::x4})
+    {
+        for (float lookaheadMs : {0.0f, 5.0f})
+        {
+            // Reference: the same chain with neutral bands (the oversampler filters trim the top of the
+            // noise).
+            const auto neutralSettings = autoGainSettings(os, lookaheadMs, 0.0f);
+            auto eRef = makeEngine(sr, 512, 1, neutralSettings);
+            const auto refOut = renderMono(*eRef, neutralSettings, in);
+            const double refDb = toDb(rms(refOut, n - 48000, n));
+            for (float gainDb : {-12.0f, 9.0f})
+            {
+                const auto s = autoGainSettings(os, lookaheadMs, gainDb);
+                auto e = makeEngine(sr, 512, 1, s);
+                const auto out = renderMono(*e, s, in);
+                const double outDb = toDb(rms(out, n - 48000, n));
+                INFO("x" << (1 << static_cast<int>(os)) << " lookahead " << lookaheadMs << " ms, band gain "
+                         << gainDb << " dB: out " << outDb << " dB, neutral " << refDb << " dB, meter "
+                         << e->meters().autoGainDb.load());
+                CHECK(std::abs(outDb - refDb) < 0.1);
+                CHECK(e->meters().autoGainDb.load() == Approx(-gainDb).margin(0.1f));
+            }
+        }
+    }
+}
+
+TEST_CASE("AutoGain reference is aligned with the processed signal at an onset", "[engine][autogain]")
+{
+    // Silence, then steady noise from `onset`. The wet path is delayed by the lookahead and the reference
+    // must be delayed identically, so the gain trajectory with the lookahead is the one without it shifted by
+    // exactly the lookahead. With a reference that is not delayed it runs 5 ms ahead of the wet signal and
+    // the measured level ratio is wrong for the first milliseconds after the onset.
+    const double sr = 48000.0;
+    const size_t block = 16;
+    const size_t onset = 4096;
+    const size_t total = onset + 9600; // 200 ms after the onset (a multiple of the block size)
+    const auto lookaheadSamples = static_cast<size_t>(MultibandEngine::lookaheadSamples(5.0f, sr));
+    REQUIRE(lookaheadSamples % block == 0);
+    const size_t shift = lookaheadSamples / block;
+    Signal in(total, 0.0f);
+    const auto sig = noise(total - onset, 41, 0.3f);
+    std::copy(sig.begin(), sig.end(), in.begin() + static_cast<std::ptrdiff_t>(onset));
+
+    for (auto os : {OSFactor::x1, OSFactor::x2})
+    {
+        auto trajectory = [&](float lookaheadMs)
+        {
+            const auto s = autoGainSettings(os, lookaheadMs, -12.0f);
+            auto e = makeEngine(sr, 512, 1, s);
+            Signal x = in;
+            return renderWithMeter(*e, s, x, static_cast<int>(block));
+        };
+        const auto off = trajectory(0.0f);
+        const auto la = trajectory(5.0f);
+        float worstDiff = 0.0f, peak = 0.0f;
+        for (size_t i = 0; i + shift < off.size(); ++i)
+        {
+            worstDiff = std::max(worstDiff, std::abs(off[i] - la[i + shift]));
+            peak = std::max(peak, off[i]);
+        }
+        INFO("x" << (1 << static_cast<int>(os)) << ": worst difference to the shifted Off trajectory "
+                 << worstDiff << " dB, Off gain reaches " << peak << " dB");
+        CHECK(peak > 3.0f); // the compensation really moves (towards +12 dB)
+        CHECK(worstDiff < 0.05f);
+    }
+}
+
+TEST_CASE("AutoGain does not pump on bursty material", "[engine][autogain]")
+{
+    // 40 ms noise bursts every 250 ms over a -60 dB bed, band gain -6 dB. The compensation must settle on
+    // +6 dB and stay there: no ripple at the burst rate.
+    const double sr = 48000.0;
+    const size_t n = static_cast<size_t>(sr) * 10;
+    Signal in = noise(n, 51, 0.001f);
+    const auto b = noise(n, 52, 0.5f);
+    for (size_t start = 0; start + 1920 < n; start += 12000)
+    {
+        for (size_t i = start; i < start + 1920; ++i)
+        {
+            in[i] = b[i];
+        }
+    }
+    for (auto os : {OSFactor::x1, OSFactor::x2})
+    {
+        for (float lookaheadMs : {0.0f, 5.0f})
+        {
+            const auto s = autoGainSettings(os, lookaheadMs, -6.0f);
+            auto e = makeEngine(sr, 512, 1, s);
+            Signal x = in;
+            const auto meter = renderWithMeter(*e, s, x, 256);
+            float lo = 100.0f, hi = -100.0f;
+            for (size_t i = meter.size() / 2; i < meter.size(); ++i)
+            {
+                lo = std::min(lo, meter[i]);
+                hi = std::max(hi, meter[i]);
+            }
+            INFO("x" << (1 << static_cast<int>(os)) << " lookahead " << lookaheadMs << " ms: gain range ["
+                     << lo << ", " << hi << "] dB over the last 5 s");
+            CHECK(hi - lo < 0.15f);
+            CHECK(0.5f * (hi + lo) == Approx(6.0f).margin(0.15f));
+        }
+    }
+}
