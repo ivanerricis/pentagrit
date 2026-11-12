@@ -89,6 +89,20 @@ void renderEditor(const juce::File& dir, ui::Style style, int bands, const juce:
     PentagritAudioProcessorEditor editor(processor);
     REQUIRE(loadFactory(processor, preset));
     REQUIRE(static_cast<int>(processor.getAPVTS().getRawParameterValue(pid::numBands)->load()) == bands);
+    if (bands == 5)
+    {
+        // Knobs that agree with the seeded gain-change meter ranges (see seedMeters).
+        constexpr std::array<float, kMaxBands> attackDb{6.0f, 4.5f, 0.0f, 6.0f, 3.0f};
+        constexpr std::array<float, kMaxBands> sustainDb{-3.0f, 0.0f, -6.0f, 0.0f, 0.0f};
+        for (int b = 0; b < bands; ++b)
+            for (auto bp : {BandParam::attack, BandParam::sustain})
+            {
+                auto* param = processor.getAPVTS().getParameter(bandParamID(b, bp));
+                REQUIRE(param != nullptr);
+                const auto v = (bp == BandParam::attack ? attackDb : sustainDb)[static_cast<size_t>(b)];
+                param->setValueNotifyingHost(param->convertTo0to1(v));
+            }
+    }
     // The engine publishes the crossover frequencies in use; there is no audio here, so mirror the
     // parameters.
     for (size_t i = 0; i < pid::xover.size(); ++i)

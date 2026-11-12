@@ -1,8 +1,10 @@
 # Pentagrit
 
-Multiband transient shaper and saturator plugin (VST3, CLAP, AU, Standalone) built with JUCE 8 and C++20.
+Multiband transient shaper and saturator plugin (VST3, CLAP, AU, Standalone) built with JUCE 8 and C++20: split the signal into 3 to 5 bands, then shape the attack and sustain and add saturation to each band separately.
 
-Status: first stable release, `v0.1.0`. The repository is public. License: AGPL-3.0-or-later.
+![Pentagrit editor, studioDark style, 5 bands](docs/images/editor-studioDark-5bands.png)
+
+Status: the latest stable release is `v0.1.0`; `v0.2.0` is coming (see the [changelog](CHANGELOG.md)). The repository is public. License: AGPL-3.0-or-later.
 
 ## Features
 
@@ -18,13 +20,38 @@ Status: first stable release, `v0.1.0`. The repository is public. License: AGPL-
 - Settings panel: zoom, six visual styles, Full or Compact layout, knob behaviour and value step, meters, preset folder and startup preset.
 - Opt-in update check against GitHub Releases (Windows and macOS, off by default, at most once a day). It only reports stable releases.
 
+New in `v0.2.0` (on `main`, not released yet):
+
+- Per-band gain-change meters: a bipolar meter of the transient shaper's gain at the top of every band strip, with hold markers.
+- Delta monitoring: listen to only what the plugin changes.
+- Level-matched bypass: A/B compares tone, not volume.
+- Band link: link bands so a knob move on one moves the same knob on the others (one undo step).
+- A tooltip on every control, and a short [user guide](docs/GUIDE.md).
+- CLAP validated with clap-validator on every platform in CI.
+
 Formats: VST3 and CLAP on Windows, macOS and Linux; AU on macOS; plus a Standalone app.
 
 New to Pentagrit? Read the [user guide](docs/GUIDE.md).
 
+![Pentagrit editor, paperLight style, 3 bands](docs/images/editor-paperLight-3bands.png)
+
+## Audio examples
+
+Each row is a factory preset applied to the same dry source. GitHub plays the files when you click a link (or download them): they are Ogg Vorbis, about 10 seconds each. Headphones help.
+
+| Preset | Dry | Processed |
+|---|---|---|
+| Punchy Kick | [dry](docs/audio/drumloop-punchy-kick-dry.ogg) | [processed](docs/audio/drumloop-punchy-kick-processed.ogg) |
+| Snare Snap | [dry](docs/audio/drumloop-snare-snap-dry.ogg) | [processed](docs/audio/drumloop-snare-snap-processed.ogg) |
+| Bass Grit | [dry](docs/audio/drumloop-bass-grit-dry.ogg) | [processed](docs/audio/drumloop-bass-grit-processed.ogg) |
+| Glue Warmth | [dry](docs/audio/drumloop-glue-warmth-dry.ogg) | [processed](docs/audio/drumloop-glue-warmth-processed.ogg) |
+| Wavefold Shimmer | [dry](docs/audio/drumloop-wavefold-shimmer-dry.ogg) | [processed](docs/audio/drumloop-wavefold-shimmer-processed.ogg) |
+
+The source is a synthetic drum loop generated in code by `tests/DocsAssetsTests.cpp`, so it carries the project's licence (AGPL-3.0-or-later). Regenerate the screenshots and examples with `scripts/dev/make_docs_assets.sh` (see `docs/DEVELOPMENT.md`).
+
 ## Install
 
-Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.1.0`; release candidates are listed there as pre-releases.
+Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.1.0`; `v0.2.0` is coming. Release candidates are listed there as pre-releases.
 
 ### Windows (installer)
 
