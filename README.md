@@ -2,7 +2,7 @@
 
 Multiband transient shaper and saturator plugin (VST3, CLAP, AU, Standalone) built with JUCE 8 and C++20.
 
-Status: pre-release. The latest published build is the pre-release `v0.1.0-rc2`; there is no stable release yet. The repository is public. License: AGPL-3.0-or-later.
+Status: first stable release, `v0.1.0`. The repository is public. License: AGPL-3.0-or-later.
 
 ## Features
 
@@ -22,7 +22,7 @@ Formats: VST3 and CLAP on Windows, macOS and Linux; AU on macOS; plus a Standalo
 
 ## Install
 
-Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). Until the first stable release only pre-releases (currently `v0.1.0-rc2`) are available, and GitHub's "latest release" link does not point to pre-releases, so pick the version from the list.
+Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.1.0`; release candidates are listed there as pre-releases.
 
 ### Windows (installer)
 

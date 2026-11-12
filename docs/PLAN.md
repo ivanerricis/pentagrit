@@ -1,6 +1,6 @@
 # Pentagrit — piano di implementazione
 
-> Stato (2026-11-11): tutti i WP (WP0–WP10) sono uniti su main, più stili visivi, valori digitati, controllo aggiornamenti, compensazione del drive, ADAA su Hard Clip/Wavefold e undo/redo (PR #12–#25). Il lookahead opzionale del transient shaper è l'ultima PR prima della release. Ultima build pubblicata: pre-release `v0.1.0-rc2`; nessuna release stabile. Prossimi passi in fondo ("Stato e prossimi passi"). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
+> Stato (2026-11-11): tutti i WP (WP0–WP10) sono uniti su main, più stili visivi, valori digitati, controllo aggiornamenti, compensazione del drive, ADAA su Hard Clip/Wavefold e undo/redo (PR #12–#25). Prima release stabile: `v0.1.0` (dopo le pre-release rc1, rc2 e rc3). Prossimi passi in fondo ("Stato e prossimi passi"). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
 
 ## Context
 Plugin audio **Pentagrit**: transient shaper + saturatore/distorsore multibanda (JUCE 8, C++20, CMake), open source AGPL-3.0-or-later, repo GitHub `ivanerricis/pentagrit` (privato all'inizio, pubblico dal 2026-10-29).
@@ -172,14 +172,10 @@ Pannello Settings (ingranaggio) con 4 schede.
 1. Eseguire WP0 (io o un agente Sonnet), creare il repo privato su GitHub, committare `docs/PLAN.md`, creare issue/milestone dei WP.
 2. Lanciare in parallelo gli agenti Sonnet 5.5 per WP1, WP2, WP3, WP5a, WP6, WP7 (poi WP4, WP8, WP5b).
 
-## Stato e prossimi passi (2026-11-11)
+## Stato e prossimi passi (2026-11-12)
 Fatto: WP0–WP10, installer Windows/macOS, stili visivi, valori digitati e passo dei valori, job clang-tidy (zero warning) e ASan/UBSan, ora bloccanti, CI macOS su `macos-15`, parsing del testo dei parametri, validazione di `stateVersion`, latenza riportata dal message thread, controllo aggiornamenti opt-in (Windows/macOS), compensazione del drive, ADAA su Hard Clip e Wavefold, undo/redo, fix del crash all'uscita (cache dei font).
 
 Da fare:
-1. Ascolto dei preset di fabbrica: timbro di Hard Clip / Wavefold con ADAA (leggermente più scuri a 1x/2x) e compensazione del drive.
-2. Test manuale in un host reale (Reaper): testo dei parametri digitato, undo/redo, compensazione della latenza con il lookahead, controllo aggiornamenti dopo la prima release stabile.
-3. Verifica visiva della top bar più stretta e del toggle DRIVE COMP.
-4. Aggiornare il ruleset di `main` perché `asan-ubsan` e `clang-tidy` siano check obbligatori (i job sono già bloccanti in `ci.yml`, vedi `docs/BRANCH_PROTECTION.md`); lo fa il maintainer dopo il merge.
-5. Applicare il ruleset di branch protection su `main` se non ancora attivo (vedi `docs/BRANCH_PROTECTION.md`).
-6. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`).
-7. Release `v0.1.0-rc3`, poi `v0.1.0`. Il controllo aggiornamenti vede solo le release stabili (il "latest" di GitHub ignora le pre-release).
+1. Prove manuali sulla `v0.1.0` pubblicata (le correzioni vanno nella release successiva): installer Windows, ascolto dei preset di fabbrica (Hard Clip / Wavefold con ADAA, compensazione del drive), test in Reaper (testo dei parametri digitato, undo/redo, compensazione della latenza con il lookahead, controllo aggiornamenti ora che esiste una release stabile).
+2. `v0.2.0`, perimetro concordato: misuratori della variazione di guadagno per banda; ascolto del solo effetto (delta); collegamento tra bande; bypass a volume uguale; tooltip e guida breve; clap-validator in CI; README con schermate aggiornate ed esempi audio.
+3. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`): fuori dalla 0.2.
