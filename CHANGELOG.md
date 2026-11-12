@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- CLAP: loading a saved state now asks the host to re-read all parameter values, so hosts that cache them (and clap-validator's state-reproducibility tests) see the restored values.
+
 ## [0.1.0] - 2026-11-12
 
 ### Added
