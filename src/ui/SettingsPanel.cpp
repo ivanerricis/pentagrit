@@ -786,8 +786,7 @@ void SettingsPanel::buildInterface(Page& page)
     page.add(heading("Controls"), 28);
     addRow("Knob drag mode", {},
            seg({"Vertical", "Circular"}, s.knobMode == KnobMode::vertical ? 0 : 1,
-               [this](int i)
-               {
+               [this](int i) {
                    apply([i](UserSettings& u)
                          { u.knobMode = i == 0 ? KnobMode::vertical : KnobMode::circular; });
                }),
