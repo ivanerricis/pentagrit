@@ -26,7 +26,8 @@ Linux)
 esac
 
 sha256_of() {
-    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+    # Read from stdin: sha256sum prefixes the digest with a backslash when the file name contains one (Windows).
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum <"$1" | cut -d' ' -f1; else shasum -a 256 <"$1" | cut -d' ' -f1; fi
 }
 
 rm -rf "$dest"
