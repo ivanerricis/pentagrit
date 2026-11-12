@@ -46,6 +46,27 @@ void LevelMatch::reset() noexcept
     gain_.setCurrentAndTargetValue(1.0f);
 }
 
+void LevelMatch::setActive(bool on, bool immediate) noexcept
+{
+    if (on == active_ && !(immediate && !on))
+    {
+        return;
+    }
+    active_ = on;
+    if (on)
+    {
+        gain_.setTargetValue(dbToGain(targetDb_));
+    }
+    else if (immediate)
+    {
+        gain_.setCurrentAndTargetValue(1.0f);
+    }
+    else
+    {
+        gain_.setTargetValue(1.0f);
+    }
+}
+
 void LevelMatch::analyse(const float* const* out, const float* const* ref, int numChannels,
                          int numSamples) noexcept
 {
@@ -76,7 +97,10 @@ void LevelMatch::analyse(const float* const* out, const float* const* ref, int n
 
     const float db = 10.0f * std::log10(meanOut_ / meanRef_);
     targetDb_ = std::isfinite(db) ? clampTo(db, -kMaxDb, kMaxDb) : 0.0f;
-    gain_.setTargetValue(dbToGain(targetDb_));
+    if (active_)
+    {
+        gain_.setTargetValue(dbToGain(targetDb_));
+    }
 }
 
 void LevelMatch::advance(int numSamples) noexcept

@@ -1423,12 +1423,12 @@ TEST_CASE("Bypass stays bit exact when the level match is off, unlearned or offl
 {
     const double sr = 48000.0;
     const auto in = noise(static_cast<size_t>(sr), 121, 0.2f);
-    auto checkExact = [&](MultibandEngine& e, const EngineSettings& s, bool nonRealtime)
+    auto checkExact = [&](MultibandEngine& e, const EngineSettings& s, bool nonRealtime, size_t skip = 2000)
     {
         const int latency = e.getLatencySamples();
         const auto out = render(e, s, Channels{in}, 480, nonRealtime)[0];
         // Skip the 20 ms crossfade when bypass was just engaged.
-        for (size_t i = static_cast<size_t>(latency) + 2000; i < in.size(); ++i)
+        for (size_t i = static_cast<size_t>(latency) + skip; i < in.size(); ++i)
             REQUIRE(out[i] == in[i - static_cast<size_t>(latency)]);
     };
 
@@ -1447,7 +1447,7 @@ TEST_CASE("Bypass stays bit exact when the level match is off, unlearned or offl
         renderNoise(*e, s, sr, 6.0, 0.2f, 122);
         s.levelMatchBypass = false;
         s.bypass = true;
-        checkExact(*e, s, false);
+        checkExact(*e, s, false, 6000); // the 50 ms ramp to unity is over by then
         CHECK(e->meters().bypassMatchDb.load() == 0.0f);
     }
     { // learned in real time, then an offline render
@@ -1475,4 +1475,49 @@ TEST_CASE("Level match ignores silence", "[engine][levelmatch]")
     CHECK(e->meters().bypassMatchDb.load() == Approx(learned).margin(0.05f));
     renderNoise(*e, s, sr, 1.0, 0.0001f, 132); // -80 dBFS, below the gate
     CHECK(e->meters().bypassMatchDb.load() == Approx(learned).margin(0.05f));
+}
+
+TEST_CASE("Switching the level match off while bypassed ramps instead of stepping", "[engine][levelmatch]")
+{
+    const double sr = 48000.0;
+    auto s = neutral(OSFactor::x2);
+    s.outGainDb = 6.0f;
+    s.levelMatchBypass = true;
+    auto e = makeEngine(sr, 512, 1, s);
+    renderNoise(*e, s, sr, 8.0, 0.2f, 141);
+    REQUIRE(e->meters().bypassMatchDb.load() == Approx(6.0f).margin(0.5f));
+    const float learned = e->meters().bypassMatchDb.load();
+    const int latency = e->getLatencySamples();
+
+    const size_t second = static_cast<size_t>(sr);
+    const size_t lead = second / 10;
+    const auto in = sine(lead + 3 * second, 440.0, sr, 0.2f);
+    auto part = [&](size_t from, size_t to)
+    {
+        return renderMono(*e, s,
+                          Signal(in.begin() + static_cast<std::ptrdiff_t>(from),
+                                 in.begin() + static_cast<std::ptrdiff_t>(to)));
+    };
+
+    s.bypass = true;
+    part(0, lead); // crossfade into the bypass (not checked)
+    Signal out;
+    for (int step = 0; step < 3; ++step)
+    {
+        s.levelMatchBypass = step != 1; // on, off, on again
+        const auto o =
+            part(lead + static_cast<size_t>(step) * second, lead + static_cast<size_t>(step + 1) * second);
+        out.insert(out.end(), o.begin(), o.end());
+    }
+    // A 440 Hz sine of 0.4 (matched) changes by < 0.025 per sample; a 6 dB step would be 0.2.
+    for (size_t i = 1; i < out.size(); ++i)
+        REQUIRE(std::abs(out[i] - out[i - 1]) < 0.04f);
+
+    const double inRms = rms(in, lead + second / 2, lead + second);
+    CHECK(toDb(rms(out, second / 2, second) / inRms) == Approx(learned).margin(0.3));
+    CHECK(toDb(rms(out, second + second / 2, 2 * second) / inRms) == Approx(0.0).margin(0.1));
+    CHECK(toDb(rms(out, 2 * second + second / 2, 3 * second) / inRms) == Approx(learned).margin(0.3));
+    // Settled off: the exact delayed input again.
+    for (size_t i = second + second / 4; i < 2 * second; ++i)
+        REQUIRE(out[i] == in[lead + i - static_cast<size_t>(latency)]);
 }

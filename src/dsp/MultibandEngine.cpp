@@ -441,6 +441,9 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
 
     // Level-matched bypass is a monitoring aid for live use only: offline renders keep the exact bypass.
     const bool matchOn = settings_.levelMatchBypass && !nonRealtime_;
+    // Switching it off ramps the applied gain to unity (50 ms) while the bypass path is heard; offline it is
+    // dropped at once.
+    levelMatch_.setActive(matchOn, nonRealtime_);
     const bool bypassFull = !bypassW_.isSmoothing() && bypassW_.getTargetValue() >= 1.0f;
     if (bypassFull)
     {
@@ -450,9 +453,9 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
             coreCold_ = true;
         }
         deltaW_.setCurrentAndTargetValue(deltaW_.getTargetValue()); // bypass wins: the delta is already off
-        if (matchOn)
+        if (levelMatch_.needsApply())
         {
-            levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n); // frozen gain
+            levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n); // frozen gain (or ramping to unity)
         }
         for (int ch = 0; ch < nc; ++ch)
         {
@@ -561,25 +564,22 @@ void MultibandEngine::processChunk(juce::AudioBuffer<float>& buffer, int start, 
 
     // Level-matched bypass: learn from the final output while bypass is settled off (and not in delta mode,
     // where the output is only the residual), otherwise scale the delayed input by the learned gain.
-    if (matchOn)
+    if (!bypassW_.isSmoothing() && bypassW_.getTargetValue() <= 0.0f)
     {
-        if (!bypassW_.isSmoothing() && bypassW_.getTargetValue() <= 0.0f)
+        if (matchOn && !deltaActive)
         {
-            if (!deltaActive)
+            for (int ch = 0; ch < nc; ++ch)
             {
-                for (int ch = 0; ch < nc; ++ch)
-                {
-                    matchOut_[static_cast<size_t>(ch)] = base.getChannelPointer(static_cast<size_t>(ch));
-                    matchRef_[static_cast<size_t>(ch)] = delayed_.getReadPointer(ch);
-                }
-                levelMatch_.analyse(matchOut_.data(), matchRef_.data(), nc, n);
+                matchOut_[static_cast<size_t>(ch)] = base.getChannelPointer(static_cast<size_t>(ch));
+                matchRef_[static_cast<size_t>(ch)] = delayed_.getReadPointer(ch);
             }
-            levelMatch_.advance(n);
+            levelMatch_.analyse(matchOut_.data(), matchRef_.data(), nc, n);
         }
-        else
-        {
-            levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n);
-        }
+        levelMatch_.advance(n);
+    }
+    else if (levelMatch_.needsApply())
+    {
+        levelMatch_.apply(delayed_.getArrayOfWritePointers(), nc, n);
     }
 
     // Bypass crossfade against the delayed dry: out = wet * (1 - w) + dry * w.

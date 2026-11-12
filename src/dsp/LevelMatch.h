@@ -26,6 +26,11 @@ public:
     // Channels are averaged. Blocks below the gate on either side are ignored.
     void analyse(const float* const* out, const float* const* ref, int numChannels, int numSamples) noexcept;
 
+    // Switches the correction on or off. Off ramps the applied gain to unity over the smoother time (at once
+    // when `immediate`); what was learned is kept, and on again ramps back to it.
+    void setActive(bool on, bool immediate = false) noexcept;
+    // True while the applied gain is not exactly unity (or still moving): the caller must run apply().
+    bool needsApply() const noexcept { return gain_.isSmoothing() || gain_.getTargetValue() != 1.0f; }
     // Moves the gain smoother on without touching any audio (blocks where the bypass path is not heard).
     void advance(int numSamples) noexcept;
     // Multiplies the block (the delayed input of the bypass path) by the smoothed gain.
@@ -39,7 +44,8 @@ private:
     float tau_ = 0.0f; // per-sample pole of the trackers
     bool primed_ = false;
     float meanOut_ = 0.0f, meanRef_ = 0.0f;
-    float targetDb_ = 0.0f;
+    float targetDb_ = 0.0f; // learned correction
+    bool active_ = false;
     juce::SmoothedValue<float> gain_;
 };
 } // namespace pentagrit
