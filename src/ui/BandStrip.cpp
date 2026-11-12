@@ -61,7 +61,18 @@ BandStrip::BandStrip(juce::AudioProcessorValueTreeState& apvts, MeterState& mete
     setupToggle(mute_, "mute", bn + " mute", "Mute this band");
     setupToggle(solo_, "solo", bn + " solo", "Solo this band");
     setupToggle(bypass_, "bypass", bn + " bypass", "Bypass the processing of this band");
-    for (auto* b : {&mute_, &solo_, &bypass_})
+    setupToggle(
+        link_, "link", bn + " link",
+        "Link this band: moving a knob of a linked band moves the same knob of the other linked bands "
+        "by the same amount (the saturation type is copied)");
+    link_.onClick = [this]
+    {
+        if (onLinkToggled)
+        {
+            onLinkToggled(link_.getToggleState());
+        }
+    };
+    for (auto* b : {&link_, &mute_, &solo_, &bypass_})
     {
         addAndMakeVisible(*b);
     }
@@ -178,6 +189,11 @@ void BandStrip::setNumBands(int n)
     refreshFreqFields();
 }
 
+void BandStrip::setLinked(bool linked)
+{
+    link_.setToggleState(linked, juce::dontSendNotification);
+}
+
 void BandStrip::setDimmed(bool dim)
 {
     if (dim == dimmed_)
@@ -271,6 +287,8 @@ void BandStrip::resized()
     solo_.setBounds(head.removeFromRight(20));
     head.removeFromRight(2);
     mute_.setBounds(head.removeFromRight(20));
+    head.removeFromRight(6);
+    link_.setBounds(head.removeFromRight(20));
     b.removeFromTop(6);
 
     if (compact_)

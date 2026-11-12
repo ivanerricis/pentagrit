@@ -51,6 +51,12 @@ PentagritAudioProcessorEditor::PentagritAudioProcessorEditor(PentagritAudioProce
         strips_[static_cast<size_t>(b)] = std::make_unique<BandStrip>(apvts, processor_.getMeters(), b);
         content_.addAndMakeVisible(*strips_[static_cast<size_t>(b)]);
     }
+    bandLink_ = std::make_unique<ui::BandLink>(apvts, processor_.getUndoManager());
+    for (int b = 0; b < kMaxBands; ++b)
+    {
+        strips_[static_cast<size_t>(b)]->onLinkToggled = [this, b](bool on) { bandLink_->setLinked(b, on); };
+        strips_[static_cast<size_t>(b)]->setLinked(bandLink_->isLinked(b));
+    }
     content_.addAndMakeVisible(global_);
     content_.addAndMakeVisible(footer_);
     footer_.setInterceptsMouseClicks(false, false);
@@ -418,6 +424,11 @@ void PentagritAudioProcessorEditor::refreshNow()
     if (n != numBands_)
     {
         applyNumBands(n, false);
+    }
+
+    for (int b = 0; b < kMaxBands; ++b)
+    { // the mask is part of the state: a restore, a preset or an A/B switch may have changed it
+        strips_[static_cast<size_t>(b)]->setLinked(bandLink_->isLinked(b));
     }
 
     bool anySolo = false;
