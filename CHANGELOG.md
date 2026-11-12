@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Oversampling and Bands can no longer be automated by the host.
 - Latency changes are reported to the host from the message thread, up to about 33 ms after they happen.
 - The DSP is about twice as fast at 4x and 8x oversampling.
+- The lookahead costs about 5 to 8 % of extra engine CPU time at 1x and 2x oversampling (measured with a new hidden benchmark, figures in `docs/ARCHITECTURE.md`); new tests pin the auto-gain alignment with lookahead and oversampling and the clean state after `reset()`.
 
 ### Fixed
 
