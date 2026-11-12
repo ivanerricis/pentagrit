@@ -1,6 +1,6 @@
 # Pentagrit — piano di implementazione
 
-> Stato (2026-11-11): tutti i WP (WP0–WP10) sono uniti su main, più stili visivi, valori digitati, controllo aggiornamenti, compensazione del drive, ADAA su Hard Clip/Wavefold e undo/redo (PR #12–#25). Prima release stabile: `v0.1.0` (dopo le pre-release rc1, rc2 e rc3). Prossimi passi in fondo ("Stato e prossimi passi"). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
+> Stato (2026-11-11): tutti i WP (WP0–WP10) sono uniti su main, più stili visivi, valori digitati, controllo aggiornamenti, compensazione del drive, ADAA su Hard Clip/Wavefold e undo/redo (PR #12–#25). Prima release stabile: `v0.1.0` (dopo le pre-release rc1, rc2 e rc3). Lavori della 0.2 completati (PR #32–#41); release `v0.2.0` in preparazione. Prossimi passi in fondo ("Stato e prossimi passi"). Mockup UI: https://claude.ai/artifact/3eE8dkHNrkkod84GMqkyhf (sorgenti in docs/design/). Logo/icone in resources/brand/.
 
 ## Context
 Plugin audio **Pentagrit**: transient shaper + saturatore/distorsore multibanda (JUCE 8, C++20, CMake), open source AGPL-3.0-or-later, repo GitHub `ivanerricis/pentagrit` (privato all'inizio, pubblico dal 2026-10-29).
@@ -176,6 +176,8 @@ Pannello Settings (ingranaggio) con 4 schede.
 Fatto: WP0–WP10, installer Windows/macOS, stili visivi, valori digitati e passo dei valori, job clang-tidy (zero warning) e ASan/UBSan, ora bloccanti, CI macOS su `macos-15`, parsing del testo dei parametri, validazione di `stateVersion`, latenza riportata dal message thread, controllo aggiornamenti opt-in (Windows/macOS), compensazione del drive, ADAA su Hard Clip e Wavefold, undo/redo, fix del crash all'uscita (cache dei font).
 
 Da fare:
-1. Prove manuali sulla `v0.1.0` pubblicata (le correzioni vanno nella release successiva): installer Windows, ascolto dei preset di fabbrica (Hard Clip / Wavefold con ADAA, compensazione del drive), test in Reaper (testo dei parametri digitato, undo/redo, compensazione della latenza con il lookahead, controllo aggiornamenti ora che esiste una release stabile).
-2. `v0.2.0`, perimetro concordato: misuratori della variazione di guadagno per banda; ascolto del solo effetto (delta); collegamento tra bande; bypass a volume uguale; tooltip e guida breve; clap-validator in CI; README con schermate aggiornate ed esempi audio.
+1. Prossimo passo: unire la PR di release `chore: release 0.2.0`, eseguire la checklist manuale di `docs/RELEASING.md` (controlli 0.2 più quelli 0.1.0 rimasti: installer Windows, ascolto dei preset di fabbrica, latenza del lookahead in Reaper, controllo aggiornamenti), poi taggare `v0.2.0` sul commit di merge a CI di `main` verde (macOS incluso).
+2. `v0.2.0`, perimetro completato (PR #32–#41): misuratori della variazione di guadagno per banda; ascolto del solo effetto (delta); collegamento tra bande; bypass a volume uguale; tooltip e guida breve; clap-validator bloccante in CI; fix dello stato CLAP; README con schermate aggiornate ed esempi audio.
 3. Firma del codice / notarizzazione (`docs/MACOS_SIGNING.md`): fuori dalla 0.2.
+4. Verificare che il nome "Pentagrit" non abbia conflitti di marchio.
+5. Pulizia: rimuovere worktree obsoleti (`git worktree list`, `git worktree remove`) e branch già uniti.
