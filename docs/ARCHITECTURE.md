@@ -24,7 +24,7 @@ Bypass is a delay of L samples with a 20 ms crossfade.
 
 ## Parameters (65)
 
-`kNumParameters` in `src/params/Parameters.h` is the authority: 14 global + 5 bands x 10 per-band parameters (64 on `main` today, 65 with `lookahead`).
+`kNumParameters` in `src/params/Parameters.h` is the authority: 15 global + 5 bands x 10 per-band parameters = 65.
 
 Global: `inGain`, `outGain`, `mix`, `autoGain`, `driveComp`, `oversampling`, `numBands` (2..5, default 3), `osPhase` (Linear/Minimum, default Linear), `osRender` (Same as live/2x/4x/8x, default Same as live), `lookahead` (Off/1/2/5 ms, default Off), `xover1..4` (20-20k Hz, log, defaults 120/1200/3500/8000), `bypass`.
 Per band `b1_`..`b5_`: `gain`, `attack`, `sustain` (+-24 dB), `speed`, `satType`, `drive` (0-36 dB), `mix`, `mute`, `solo`, `bypass`.
@@ -73,7 +73,7 @@ inline constexpr int kNumBandParams = 10;
 juce::String bandParamID(int band0, BandParam p);   // (0, gain) -> "b1_gain"
 }
 // params/Parameters.h
-inline constexpr int kNumParameters = 14 + kMaxBands * kNumBandParams;   // current value: see the header
+inline constexpr int kNumParameters = 15 + kMaxBands * kNumBandParams;   // 65
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 struct ParamRefs { explicit ParamRefs(juce::AudioProcessorValueTreeState&); /* cache atomics */
   std::atomic<float> *inGain,*outGain,*mix,*autoGain,*oversampling,*numBands,*bypass,*osPhase,*osRender,*driveComp; /* + lookahead */

@@ -16,6 +16,28 @@ CI (Windows + Linux build, tests, pluginval 10, clang-format 18) is green; clang
 ## Open items / next steps
 1. Manual checks on the released `v0.1.0` build, fixes go into the next release: run the Windows installer, listening check of the factory presets (Hard Clip / Wavefold with ADAA, drive compensation), Reaper test (typed parameter text, undo/redo, latency compensation with the lookahead, update check now that a stable release exists).
 2. Scope of `v0.2.0`, agreed with the maintainer: per-band gain-change meters for the transient shaper; delta (effect only) monitoring; band link (move one parameter on all bands); level-matched bypass; tooltips and a short guide; clap-validator in CI; README with current screenshots and audio examples.
+
+   v0.2 work packages (one PR each, merge order 0 -> A1 -> A2 -> B -> C -> D -> F1 -> E -> F2 -> R):
+   - WP-0: docs prep (changelog sections, parameter count fix, this list).
+   - A1: fix CLAP state reproducibility (values set through process events must be in the saved state).
+   - A2: run clap-validator on every platform and make it blocking.
+   - B: per-band gain-change meters with peak hold.
+   - C: delta monitoring and level-matched bypass.
+   - D: band link (relative offset across bands, one undo step).
+   - E: complete tooltips and add `docs/GUIDE.md`.
+   - F1: Catch2 generators for README screenshots and audio examples.
+   - F2: README with screenshots and audio examples.
+   - R: release 0.2.0 (changelog, version, manual checklist, tag).
+
+   Design decisions:
+   - D0: no new parameters; `kNumParameters` stays 65 and `stateVersion` 1.
+   - D1: delta is a session toggle (not saved); subtracts the aligned dry after the mix blend; bypass wins.
+   - D2: level-matched bypass is a separate monitoring mode (per-user option, off by default); plain bypass stays bit-exact.
+   - D3: band link is a relative offset in normalized domain with a per-band toggle; the mask lives in `apvts.state`.
+   - D4: gain-change meter reads min/max dB from the transient shaper per host block; saturation level excluded.
+   - D5: fix the clap-validator state bug first, then make the check blocking (no ruleset change).
+   - D6: each feature package writes its own tooltips; WP-E does the final pass and the guide.
+   - D7: docs assets come from hidden `[.docs]` Catch2 cases into `docs/images/` and `docs/audio/` (OGG, <= 3 MB total).
 3. Code signing / notarisation (Windows signing, Apple notarisation, `docs/MACOS_SIGNING.md`): not planned for 0.2.
 4. Done: the `main` ruleset requires six checks, including `asan-ubsan` and `clang-tidy` (`docs/BRANCH_PROTECTION.md`).
 5. Verify the product name "Pentagrit" is free of trademark conflicts before the stable release.
