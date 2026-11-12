@@ -73,5 +73,14 @@ On Windows with Reaper (and other hosts as available), for both VST3 and CLAP:
 - [ ] macOS: AU validates with `auval` (codes from `CMakeLists.txt`) and loads in Logic/Reaper after `xattr -dr com.apple.quarantine`.
 - [ ] Windows: run the setup `.exe` on a clean machine; select/deselect components, plug-ins appear in the DAW, uninstall removes them.
 - [ ] macOS: install the `.pkg` (component selection, licence screen); AU/VST3/CLAP scan in the DAW; Standalone launches from /Applications.
+- [ ] Windows: the update check (Settings, About, "Check now") reports the right result against the published stable release.
+- [ ] Factory presets: listening check (Hard Clip / Wavefold with ADAA, drive compensation).
+- [ ] Lookahead: latency is reported and compensated in Reaper (null test against bypass with lookahead on and with oversampling changes).
+- [ ] Delta: with neutral bands the output is null by ear (nothing audible) and with mix at 0 it is silent; with the switch off the normal signal returns without clicks; bypass wins.
+- [ ] Match bypass: while playing, switching bypass keeps the matched level and the readout shows the applied gain; a Reaper offline render with bypass automation is sample-exact against the dry track (the exact bypass is used offline).
+- [ ] Band link: dragging a linked band moves all linked bands by the same amount; one Ctrl+Z restores all of them; host automation of a parameter is not linked.
+- [ ] Gain-change meters react on drums and follow the meter hold and release settings.
+- [ ] CLAP in Reaper or Bitwig: automate a parameter, save the project, reopen it; the values are kept.
+- [ ] Tooltips are present on every control of the editor and of the settings panel.
 - [ ] `sha256sum -c SHA256SUMS.txt` passes on the downloaded assets.
 - [ ] Bundles include LICENSE and match `THIRD_PARTY_NOTICES.md`.

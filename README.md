@@ -4,7 +4,7 @@ Multiband transient shaper and saturator plugin (VST3, CLAP, AU, Standalone) bui
 
 ![Pentagrit editor, studioDark style, 5 bands](docs/images/editor-studioDark-5bands.png)
 
-Status: the latest stable release is `v0.1.0`; `v0.2.0` is coming (see the [changelog](CHANGELOG.md)). The repository is public. License: AGPL-3.0-or-later.
+Status: `v0.2.0` is the current stable release (see the [changelog](CHANGELOG.md)). The repository is public. License: AGPL-3.0-or-later.
 
 ## Features
 
@@ -20,7 +20,7 @@ Status: the latest stable release is `v0.1.0`; `v0.2.0` is coming (see the [chan
 - Settings panel: zoom, six visual styles, Full or Compact layout, knob behaviour and value step, meters, preset folder and startup preset.
 - Opt-in update check against GitHub Releases (Windows and macOS, off by default, at most once a day). It only reports stable releases.
 
-New in `v0.2.0` (on `main`, not released yet):
+New in `v0.2.0`:
 
 - Per-band gain-change meters: a bipolar meter of the transient shaper's gain at the top of every band strip, with hold markers.
 - Delta monitoring: listen to only what the plugin changes.
@@ -51,7 +51,7 @@ The source is a synthetic drum loop generated in code by `tests/DocsAssetsTests.
 
 ## Install
 
-Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.1.0`; `v0.2.0` is coming. Release candidates are listed there as pre-releases.
+Builds are published on the [releases page](https://github.com/ivanerricis/pentagrit/releases). The current stable release is `v0.2.0`. Release candidates are listed there as pre-releases.
 
 ### Windows (installer)
 
