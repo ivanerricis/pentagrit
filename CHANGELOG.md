@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-12
+
 ### Added
 
 - Multiband engine: 2 to 5 bands (default 3) with LR4 crossovers, per-band transient shaper (attack, sustain, speed) and saturator (tanh, soft clip, tube, wavefold, hard clip), auto-gain, phase-matched global mix, per-band mute, solo and bypass.
