@@ -11,7 +11,7 @@ Pentagrit is AGPL-3.0-or-later and links JUCE under the AGPLv3 option. **Distrib
 1. `v0.1.0-rc1`: dry run of the whole release pipeline (tag, CI build on 3 OS, zip, GitHub pre-release). Delete it afterwards if not needed.
 2. `v0.1.0`: first release.
 3. `v0.x`: minor bumps for features, patch for fixes; breaking changes are allowed before 1.0 but must be in the changelog.
-4. `v1.0.0` when stable: parameter IDs and state format frozen with migrations in place; no known crash or realtime-safety bugs; passes pluginval (strictness 10), auval and clap-validator on all platforms; manual DAW checklist green on Windows, macOS and Linux; documentation and licence/distribution decisions complete.
+4. `v1.0.0` when stable: parameter IDs and state format frozen with migrations in place; no known crash or realtime-safety bugs; passes pluginval (strictness 10), auval and clap-validator on all platforms (all three are blocking in CI); manual DAW checklist green on Windows, macOS and Linux; documentation and licence/distribution decisions complete.
 
 ## Version bump rule
 
